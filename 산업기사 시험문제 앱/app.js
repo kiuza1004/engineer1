@@ -1,15 +1,19 @@
 /**
  * 산업안전산업기사 마스터 웹앱 메인 엔진
- * 순수 Vanilla JS (외부 라이브러리 0, 높은 하위 호환성)
+ * 순수 Vanilla JS (외부 프레임워크 종속성 0, 높은 하위 호환성)
  */
 
 (function () {
   'use strict';
 
-  // 1. 상태 객체
+  const STORAGE_KEY_WRONG_NOTES = 'industrial_safety_wrong_notes';
+  const STORAGE_KEY_THEME = 'industrial_safety_theme';
+
+  // 1. 상태 관리
   const state = {
-    currentMenu: 'info',
-    theme: localStorage.getItem('app_theme') || 'light',
+    currentMenu: 'info', // 'info' | 'past' | 'applied' | 'wrongNotes'
+    currentSummarySubId: 'sub1', // 'sub1' ~ 'sub5'
+    theme: localStorage.getItem(STORAGE_KEY_THEME) || 'light',
 
     pastExam: {
       mode: 'practice', // 'practice' | 'mock'
@@ -27,6 +31,16 @@
       userAnswers: {},
       bookmarks: new Set(),
       isSubmitted: false
+    },
+
+    // 오답노트 전용 재도전 시험 상태
+    retakeExam: {
+      active: false,
+      questions: [],
+      currentIndex: 0,
+      userAnswers: {},
+      bookmarks: new Set(),
+      isSubmitted: false
     }
   };
 
@@ -36,13 +50,17 @@
     closeNoticeBtn: document.getElementById('closeNoticeBtn'),
     themeToggleBtn: document.getElementById('themeToggleBtn'),
     navTabBtns: document.querySelectorAll('.nav-tab-btn'),
+    wrongCountBadge: document.getElementById('wrongCountBadge'),
     sections: {
       info: document.getElementById('menu-info'),
       past: document.getElementById('menu-past'),
-      applied: document.getElementById('menu-applied')
+      applied: document.getElementById('menu-applied'),
+      wrongNotes: document.getElementById('menu-wrongNotes')
     },
-    // 기본정보
+    // 기본정보 & 요약노트
     subTabBtns: document.querySelectorAll('.sub-tab-btn'),
+    subjectChips: document.getElementById('subjectChips'),
+    detailedSummaryContainer: document.getElementById('detailedSummaryContainer'),
     infoCertTitle: document.getElementById('infoCertTitle'),
     infoCertSub: document.getElementById('infoCertSub'),
     infoCertOverview: document.getElementById('infoCertOverview'),
@@ -52,7 +70,6 @@
     eligibilityOptions: document.getElementById('eligibilityOptions'),
     eligibilityResultBox: document.getElementById('eligibilityResultBox'),
     infoCriteriaContainer: document.getElementById('infoCriteriaContainer'),
-    infoSummaryContainer: document.getElementById('infoSummaryContainer'),
     // 기출문제
     pastRoundTitle: document.getElementById('pastRoundTitle'),
     pastModeBadge: document.getElementById('pastModeBadge'),
@@ -66,14 +83,84 @@
     appliedTitle: document.getElementById('appliedTitle'),
     appliedOmrGrid: document.getElementById('appliedOmrGrid'),
     appliedQuestionContainer: document.getElementById('appliedQuestionContainer'),
-    appliedResultContainer: document.getElementById('appliedResultContainer')
+    appliedResultContainer: document.getElementById('appliedResultContainer'),
+    // 오답노트
+    wrongStatsBar: document.getElementById('wrongStatsBar'),
+    wrongNotesListContainer: document.getElementById('wrongNotesListContainer'),
+    btnRetakeWrongQuestions: document.getElementById('btnRetakeWrongQuestions'),
+    btnClearAllWrongNotes: document.getElementById('btnClearAllWrongNotes')
   };
 
-  // 초기화
+  // 3. 오답노트 로컬스토리지 관리
+  function getStoredWrongNotes() {
+    try {
+      const data = localStorage.getItem(STORAGE_KEY_WRONG_NOTES);
+      return data ? JSON.parse(data) : [];
+    } catch (e) {
+      console.error('오답노트 읽기 오류:', e);
+      return [];
+    }
+  }
+
+  function saveStoredWrongNotes(notes) {
+    try {
+      localStorage.setItem(STORAGE_KEY_WRONG_NOTES, JSON.stringify(notes));
+      updateWrongBadge();
+    } catch (e) {
+      console.error('오답노트 저장 오류:', e);
+    }
+  }
+
+  function addWrongQuestion(questionObj, userAnswer) {
+    const list = getStoredWrongNotes();
+    const existingIndex = list.findIndex(item => item.id === questionObj.id);
+    const itemData = {
+      id: questionObj.id,
+      subject: questionObj.subject,
+      question: questionObj.question,
+      options: questionObj.options,
+      answer: questionObj.answer,
+      explanation: questionObj.explanation,
+      userAnswer: userAnswer,
+      date: new Date().toISOString()
+    };
+
+    if (existingIndex >= 0) {
+      list[existingIndex] = itemData;
+    } else {
+      list.push(itemData);
+    }
+    saveStoredWrongNotes(list);
+  }
+
+  function removeWrongQuestion(questionId) {
+    let list = getStoredWrongNotes();
+    list = list.filter(item => item.id !== questionId);
+    saveStoredWrongNotes(list);
+    renderWrongNotes();
+  }
+
+  function clearAllWrongNotes() {
+    if (confirm('오답노트의 모든 문제를 완전히 비우시겠습니까?')) {
+      saveStoredWrongNotes([]);
+      renderWrongNotes();
+    }
+  }
+
+  function updateWrongBadge() {
+    const list = getStoredWrongNotes();
+    if (dom.wrongCountBadge) {
+      dom.wrongCountBadge.textContent = list.length;
+      dom.wrongCountBadge.style.display = list.length > 0 ? 'inline-block' : 'none';
+    }
+  }
+
+  // 4. 초기화 함수
   function initApp() {
     initTheme();
     initPwa();
     bindEventListeners();
+    updateWrongBadge();
     renderAll();
   }
 
@@ -96,17 +183,18 @@
     }
   }
 
+  // 이벤트 바인딩
   function bindEventListeners() {
-    // PWA 공지 닫기
+    // PWA 배너 닫기
     dom.closeNoticeBtn.addEventListener('click', () => {
       dom.pwaNoticeBanner.style.display = 'none';
     });
 
-    // 다크모드
+    // 테마 토글
     dom.themeToggleBtn.addEventListener('click', () => {
       state.theme = state.theme === 'dark' ? 'light' : 'dark';
       document.documentElement.setAttribute('data-theme', state.theme);
-      localStorage.setItem('app_theme', state.theme);
+      localStorage.setItem(STORAGE_KEY_THEME, state.theme);
       updateThemeBtn();
     });
 
@@ -124,7 +212,20 @@
       });
     });
 
-    // 기출문제 모드 전환 (연습 vs 실전 모의고사)
+    // 요약노트 과목 칩스 클릭
+    if (dom.subjectChips) {
+      const chipBtns = dom.subjectChips.querySelectorAll('.chip-btn');
+      chipBtns.forEach(chip => {
+        chip.addEventListener('click', () => {
+          chipBtns.forEach(c => c.classList.remove('active'));
+          chip.classList.add('active');
+          state.currentSummarySubId = chip.dataset.subId;
+          renderDetailedSummary();
+        });
+      });
+    }
+
+    // 기출문제 모드 전환 버튼
     dom.togglePastModeBtn.addEventListener('click', () => {
       if (state.pastExam.mode === 'practice') {
         if (confirm('실전 CBT 모의고사 모드로 전환하시겠습니까?\n25분 제한시간 타이머가 시작되며, 최종 제출 시 채점 결과가 공개됩니다.')) {
@@ -140,6 +241,14 @@
       resetExamState('past', false);
       renderPastExam();
     });
+
+    // 오답노트 전체 비우기
+    dom.btnClearAllWrongNotes.addEventListener('click', clearAllWrongNotes);
+
+    // 오답노트 재도전 풀기
+    dom.btnRetakeWrongQuestions.addEventListener('click', () => {
+      startRetakeWrongExam();
+    });
   }
 
   function switchMainMenu(target) {
@@ -149,6 +258,7 @@
 
     if (target === 'past') renderPastExam();
     else if (target === 'applied') renderAppliedExam();
+    else if (target === 'wrongNotes') renderWrongNotes();
     else renderInfo();
   }
 
@@ -161,12 +271,14 @@
 
   function renderAll() {
     renderInfo();
+    renderDetailedSummary();
     renderPastExam();
     renderAppliedExam();
+    renderWrongNotes();
   }
 
   // ============================================================
-  // 1. 기본정보 메뉴
+  // 1. 기본정보 및 과목별 기출 핵심요약노트 렌더링
   // ============================================================
   function renderInfo() {
     const info = APP_DATA.info;
@@ -178,7 +290,7 @@
     dom.infoCertCareer.textContent = info.careerProspect;
     dom.infoCertFee.textContent = info.examFee;
 
-    // 일정
+    // 일정 테이블
     dom.infoScheduleTableBody.innerHTML = '';
     info.schedule.forEach(sch => {
       const tr = document.createElement('tr');
@@ -206,7 +318,7 @@
         dom.eligibilityResultBox.style.display = 'block';
         dom.eligibilityResultBox.innerHTML = `
           <div style="color:var(--success); margin-bottom:4px;">✅ <strong>[응시 자격 충족 가능]</strong></div>
-          <div>선택하신 <strong>'${el.type}'</strong> 전형은 Q-Net 서류 제출 기간에 관련 서류(졸업증명서, 경력증명서, 학점인정증명서 등)를 등록하시면 필기시험 합격이 유효 인정됩니다.</div>
+          <div>선택하신 <strong>'${el.type}'</strong> 전형은 Q-Net 서류 심사 시 관련 서류를 제출하시면 필기 응시 자격이 부여됩니다.</div>
         `;
       });
       dom.eligibilityOptions.appendChild(label);
@@ -242,32 +354,33 @@
         </ul>
       </div>
     `;
+  }
 
-    // 핵심 공식 아코디언
-    dom.infoSummaryContainer.innerHTML = '';
-    info.summaries.forEach((sum, idx) => {
-      const item = document.createElement('div');
-      item.className = 'summary-item';
-      item.innerHTML = `
-        <div class="summary-header">
-          <span>${sum.subject}</span>
-          <span>▼</span>
-        </div>
-        <div class="summary-body" style="${idx === 0 ? 'display:block;' : 'display:none;'}">
-          <ul style="padding-left:18px; display:flex; flex-direction:column; gap:8px;">
-            ${sum.points.map(p => `<li>${p}</li>`).join('')}
-          </ul>
-        </div>
-      `;
-      const header = item.querySelector('.summary-header');
-      const body = item.querySelector('.summary-body');
-      header.addEventListener('click', () => {
-        const isHidden = body.style.display === 'none';
-        body.style.display = isHidden ? 'block' : 'none';
-        header.querySelector('span:last-child').textContent = isHidden ? '▲' : '▼';
-      });
-      dom.infoSummaryContainer.appendChild(item);
-    });
+  // 과목별 세부 요약집 렌더링
+  function renderDetailedSummary() {
+    const info = APP_DATA.info;
+    if (!info || !info.detailedSummaries) return;
+
+    const currentSub = info.detailedSummaries.find(s => s.subjectId === state.currentSummarySubId) || info.detailedSummaries[0];
+    if (!currentSub) return;
+
+    dom.detailedSummaryContainer.innerHTML = `
+      <div style="margin-bottom:12px;">
+        <h3 style="font-size:1.1rem; font-weight:800; color:var(--primary); display:flex; align-items:center; gap:6px;">
+          <span>📌</span> ${currentSub.subjectName}
+        </h3>
+      </div>
+      <div style="display:flex; flex-direction:column; gap:14px;">
+        ${currentSub.sections.map(sec => `
+          <div class="summary-section-box">
+            <div class="summary-section-title">
+              <span>🎯</span> ${sec.title}
+            </div>
+            <div class="summary-section-body">${escapeHtml(sec.content)}</div>
+          </div>
+        `).join('')}
+      </div>
+    `;
   }
 
   // ============================================================
@@ -340,8 +453,8 @@
   }
 
   function renderOmrGrid(type) {
-    const exam = type === 'past' ? APP_DATA.pastExams[0] : APP_DATA.appliedExams[0];
-    const s = type === 'past' ? state.pastExam : state.appliedExam;
+    const exam = type === 'past' ? APP_DATA.pastExams[0] : (type === 'applied' ? APP_DATA.appliedExams[0] : state.retakeExam);
+    const s = type === 'past' ? state.pastExam : (type === 'applied' ? state.appliedExam : state.retakeExam);
     const gridEl = type === 'past' ? dom.pastOmrGrid : dom.appliedOmrGrid;
 
     gridEl.innerHTML = '';
@@ -352,7 +465,7 @@
 
       if (idx === s.currentIndex) btn.classList.add('current');
       if (s.userAnswers[q.id] !== undefined) btn.classList.add('answered');
-      if (s.bookmarks.has(q.id)) btn.classList.add('bookmarked');
+      if (s.bookmarks && s.bookmarks.has(q.id)) btn.classList.add('bookmarked');
 
       if (s.isSubmitted) {
         if (s.userAnswers[q.id] === q.answer) {
@@ -372,15 +485,15 @@
   }
 
   function renderQuestionCard(type) {
-    const exam = type === 'past' ? APP_DATA.pastExams[0] : APP_DATA.appliedExams[0];
-    const s = type === 'past' ? state.pastExam : state.appliedExam;
-    const container = type === 'past' ? dom.pastQuestionContainer : dom.appliedQuestionContainer;
+    const exam = type === 'past' ? APP_DATA.pastExams[0] : (type === 'applied' ? APP_DATA.appliedExams[0] : state.retakeExam);
+    const s = type === 'past' ? state.pastExam : (type === 'applied' ? state.appliedExam : state.retakeExam);
+    const container = type === 'past' ? dom.pastQuestionContainer : (type === 'applied' ? dom.appliedQuestionContainer : dom.pastQuestionContainer);
     const totalQ = exam.questions.length;
     const q = exam.questions[s.currentIndex];
 
     if (!q) return;
 
-    const isBookmarked = s.bookmarks.has(q.id);
+    const isBookmarked = s.bookmarks && s.bookmarks.has(q.id);
     const selectedOption = s.userAnswers[q.id];
     const isAnswered = selectedOption !== undefined;
     const showExplanation = (s.mode === 'practice' && isAnswered) || s.isSubmitted;
@@ -437,7 +550,7 @@
         ${showExplanation ? `
           <div class="explanation-box">
             <div class="explanation-title">
-              💡 ${selectedOption === q.answer ? '<span style="color:var(--success);">정답입니다!</span>' : '<span style="color:var(--danger);">오답입니다.</span>'} 정답: ${q.answer + 1}번
+              💡 ${selectedOption === q.answer ? '<span style="color:var(--success);">정답입니다!</span>' : '<span style="color:var(--danger);">오답입니다. (오답노트에 자동 저장됨)</span>'} 정답: ${q.answer + 1}번
             </div>
             <div style="white-space:pre-wrap;">${escapeHtml(q.explanation)}</div>
           </div>
@@ -471,12 +584,23 @@
       renderOmrGrid(type);
     });
 
-    // 보기 선택
+    // 보기 클릭
     container.querySelectorAll('.option-item').forEach(el => {
       el.addEventListener('click', () => {
         if (s.isSubmitted) return;
         const optIdx = parseInt(el.dataset.optIdx, 10);
         s.userAnswers[q.id] = optIdx;
+
+        // 연습모드에서 틀린 경우 오답노트에 실시간 저장
+        if (s.mode === 'practice') {
+          if (optIdx !== q.answer) {
+            addWrongQuestion(q, optIdx);
+          } else {
+            // 맞추었으면 오답노트에서 자동 제거 (재도전 시 마스터 처리)
+            removeWrongQuestion(q.id);
+          }
+        }
+
         renderQuestionCard(type);
         renderOmrGrid(type);
       });
@@ -520,18 +644,33 @@
   }
 
   function submitExam(type) {
-    const s = type === 'past' ? state.pastExam : state.appliedExam;
+    const exam = type === 'past' ? APP_DATA.pastExams[0] : (type === 'applied' ? APP_DATA.appliedExams[0] : state.retakeExam);
+    const s = type === 'past' ? state.pastExam : (type === 'applied' ? state.appliedExam : state.retakeExam);
+
     if (type === 'past') stopPastTimer();
     s.isSubmitted = true;
     s.currentIndex = 0;
+
+    // 틀린 문제들을 오답노트에 자동 등록
+    exam.questions.forEach(q => {
+      const userAns = s.userAnswers[q.id];
+      if (userAns !== undefined && userAns !== q.answer) {
+        addWrongQuestion(q, userAns);
+      } else if (userAns === q.answer) {
+        // 맞추면 오답노트 목록에서 삭제
+        removeWrongQuestion(q.id);
+      }
+    });
+
     if (type === 'past') renderPastExam();
-    else renderAppliedExam();
+    else if (type === 'applied') renderAppliedExam();
+    else renderExamResult('retake');
   }
 
   function renderExamResult(type) {
-    const exam = type === 'past' ? APP_DATA.pastExams[0] : APP_DATA.appliedExams[0];
-    const s = type === 'past' ? state.pastExam : state.appliedExam;
-    const container = type === 'past' ? dom.pastResultContainer : dom.appliedResultContainer;
+    const exam = type === 'past' ? APP_DATA.pastExams[0] : (type === 'applied' ? APP_DATA.appliedExams[0] : state.retakeExam);
+    const s = type === 'past' ? state.pastExam : (type === 'applied' ? state.appliedExam : state.retakeExam);
+    const container = type === 'past' ? dom.pastResultContainer : (type === 'applied' ? dom.appliedResultContainer : dom.pastResultContainer);
 
     let correctCount = 0;
     const wrongQuestions = [];
@@ -549,13 +688,13 @@
     container.innerHTML = `
       <div class="card result-card">
         <div class="result-badge ${isPassed ? 'pass' : 'fail'}">
-          ${isPassed ? '🎉 산업안전 합격 기준 통과!' : '⚠️ 기준 미달 (과락 주의)'}
+          ${isPassed ? '🎉 산업안전 합격선 통과!' : '⚠️ 과락 및 기준 점수 미달'}
         </div>
         <div class="result-score">
           ${score}<span> / 100점</span>
         </div>
         <p style="color:var(--text-muted); font-size:0.95rem;">
-          ${isPassed ? '축하합니다! 합격 기준인 60점을 달성하였습니다.' : '합격선(60점)에 미달하였습니다. 오답 노트와 핵심 공식을 반드시 복습하세요!'}
+          ${isPassed ? '축하합니다! 합격 기준인 60점을 달성하였습니다.' : '합격선(60점)에 미달하였습니다. 오답 노트로 이동하여 틀린 문제를 다시 복습하세요!'}
         </p>
 
         <div class="result-stats-grid">
@@ -569,37 +708,16 @@
           </div>
           <div class="stat-item">
             <div class="stat-value" style="color:var(--danger);">${wrongQuestions.length}</div>
-            <div class="stat-label">오답 문항</div>
+            <div class="stat-label">오답 문항 (노트 자동저장)</div>
           </div>
         </div>
 
         <div style="display:flex; justify-content:center; gap:12px; margin-top:20px; flex-wrap:wrap;">
           <button class="btn btn-primary" id="btnReviewAll">전체 문항 해설 보기</button>
+          <button class="btn btn-secondary" id="btnGoToWrongNotes">🚨 스마트 오답노트 확인</button>
           <button class="btn btn-secondary" id="btnRestart">새로 다시 풀기</button>
         </div>
       </div>
-
-      ${wrongQuestions.length > 0 ? `
-        <div class="card" style="margin-top:20px;">
-          <h3 class="card-title" style="color:var(--danger);">🚨 산업안전 오답 집중 복습 (${wrongQuestions.length}문항)</h3>
-          <p class="card-subtitle">틀린 문항의 기출 개념과 공식을 다시 점검하십시오.</p>
-          <div style="display:flex; flex-direction:column; gap:16px;">
-            ${wrongQuestions.map((wq, wIdx) => `
-              <div class="wrong-answer-item">
-                <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
-                  <span class="question-tag">${wq.subject}</span>
-                  <span style="font-size:0.85rem; color:var(--danger); font-weight:700;">내 답: ${s.userAnswers[wq.id] !== undefined ? s.userAnswers[wq.id] + 1 : '미응답'}번 | 정답: ${wq.answer + 1}번</span>
-                </div>
-                <div style="font-weight:700; margin-bottom:10px;">${wIdx + 1}. ${escapeHtml(wq.question)}</div>
-                <div class="explanation-box" style="margin-top:0;">
-                  <div class="explanation-title">💡 상세 해설:</div>
-                  <div style="white-space:pre-wrap;">${escapeHtml(wq.explanation)}</div>
-                </div>
-              </div>
-            `).join('')}
-          </div>
-        </div>
-      ` : ''}
     `;
 
     container.querySelector('#btnReviewAll').addEventListener('click', () => {
@@ -616,6 +734,10 @@
         renderQuestionCard('applied');
         renderOmrGrid('applied');
       }
+    });
+
+    container.querySelector('#btnGoToWrongNotes').addEventListener('click', () => {
+      switchMainMenu('wrongNotes');
     });
 
     container.querySelector('#btnRestart').addEventListener('click', () => {
@@ -644,6 +766,114 @@
       renderQuestionCard('applied');
       renderOmrGrid('applied');
     }
+  }
+
+  // ============================================================
+  // 4. 스마트 오답노트 메뉴 (신규!)
+  // ============================================================
+  function renderWrongNotes() {
+    const list = getStoredWrongNotes();
+    updateWrongBadge();
+
+    // 오답 통계 요약 칩
+    const subjectStats = {};
+    list.forEach(item => {
+      subjectStats[item.subject] = (subjectStats[item.subject] || 0) + 1;
+    });
+
+    dom.wrongStatsBar.innerHTML = `
+      <div class="wrong-stat-chip" style="background:var(--primary-light); color:var(--primary); font-weight:800;">
+        총 오답: ${list.length}문항
+      </div>
+      ${Object.keys(subjectStats).map(sub => `
+        <div class="wrong-stat-chip">
+          ${sub}: <strong>${subjectStats[sub]}</strong>
+        </div>
+      `).join('')}
+    `;
+
+    // 오답 목록 렌더링
+    if (list.length === 0) {
+      dom.wrongNotesListContainer.innerHTML = `
+        <div class="empty-state-box">
+          <div class="empty-state-icon">🎉</div>
+          <h3 style="font-size:1.15rem; font-weight:800; color:var(--text-main); margin-bottom:6px;">저장된 오답이 없습니다!</h3>
+          <p style="font-size:0.9rem;">기출문제나 응용문제를 풀면 틀린 문제가 여기에 자동으로 누적됩니다.</p>
+          <button class="btn btn-primary" style="margin-top:16px;" onclick="document.querySelector('[data-target=past]').click();">
+            기출문제 풀러 가기 📝
+          </button>
+        </div>
+      `;
+      dom.btnRetakeWrongQuestions.style.display = 'none';
+      dom.btnClearAllWrongNotes.style.display = 'none';
+      return;
+    }
+
+    dom.btnRetakeWrongQuestions.style.display = 'inline-flex';
+    dom.btnClearAllWrongNotes.style.display = 'inline-flex';
+
+    dom.wrongNotesListContainer.innerHTML = list.map((item, idx) => `
+      <div class="wrong-card">
+        <div class="wrong-card-header">
+          <span class="question-tag">${item.subject}</span>
+          <button class="btn-remove-wrong" data-remove-id="${item.id}">
+            ✓ 마스터 (삭제)
+          </button>
+        </div>
+
+        <div style="font-size:1.05rem; font-weight:700; margin-bottom:14px; line-height:1.6;">
+          ${idx + 1}. ${escapeHtml(item.question)}
+        </div>
+
+        <div style="font-size:0.88rem; color:var(--danger); font-weight:700; margin-bottom:10px;">
+          • 내가 선택한 답: ${item.userAnswer !== undefined ? (item.userAnswer + 1) + '번' : '미응답'} ❌ 
+          <span style="color:var(--success); margin-left:8px;">• 정답: ${(item.answer + 1)}번 ✅</span>
+        </div>
+
+        <div class="explanation-box" style="margin-top:8px;">
+          <div class="explanation-title">💡 상세 해설 & 암기 포인트:</div>
+          <div style="white-space:pre-wrap;">${escapeHtml(item.explanation)}</div>
+        </div>
+      </div>
+    `).join('');
+
+    // 개별 삭제 버튼 이벤트 바인딩
+    dom.wrongNotesListContainer.querySelectorAll('.btn-remove-wrong').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = parseInt(btn.dataset.removeId, 10);
+        removeWrongQuestion(id);
+      });
+    });
+  }
+
+  // 오답만 모아서 재도전 시험 모드 시작
+  function startRetakeWrongExam() {
+    const list = getStoredWrongNotes();
+    if (list.length === 0) {
+      alert('오답노트에 문제가 없습니다.');
+      return;
+    }
+
+    state.retakeExam = {
+      active: true,
+      title: '오답노트 집중 재도전 모의고사',
+      questions: [...list],
+      currentIndex: 0,
+      userAnswers: {},
+      bookmarks: new Set(),
+      mode: 'practice',
+      isSubmitted: false
+    };
+
+    // 기출문제 탭을 재도전 모드로 스위칭
+    state.pastExam.mode = 'practice';
+    switchMainMenu('past');
+    dom.pastRoundTitle.textContent = `🚨 오답 재도전 챌린지 (${list.length}문항)`;
+    dom.pastQuestionContainer.style.display = 'block';
+    dom.pastResultContainer.style.display = 'none';
+
+    renderQuestionCard('retake');
+    renderOmrGrid('retake');
   }
 
   function escapeHtml(str) {
