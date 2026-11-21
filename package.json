@@ -1,0 +1,17 @@
+{
+  "name": "industrial-engineer-study-app",
+  "version": "1.0.0",
+  "description": "산업기사 자격증 수험생을 위한 기본정보, 기출문제, 기출변형 응용문제 학습 어플리케이션",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "keywords": [
+    "pwa",
+    "industrial-engineer",
+    "cbt",
+    "study-app"
+  ],
+  "author": "",
+  "license": "MIT"
+}

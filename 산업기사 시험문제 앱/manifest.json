@@ -1,0 +1,24 @@
+{
+  "name": "산업기사 자격증 마스터",
+  "short_name": "산업기사공부",
+  "description": "산업기사 기본정보, 기출문제 CBT, 기출변형 응용문제 완벽 대비 어플",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#2563eb",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "icons/icon-192.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icons/icon-512.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

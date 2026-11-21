@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="grad512" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3b82f6" />
+      <stop offset="100%" stop-color="#1e40af" />
+    </linearGradient>
+    <filter id="shadow512" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="10" stdDeviation="15" flood-color="#000" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+  <rect width="512" height="512" rx="110" fill="url(#grad512)" />
+  <g filter="url(#shadow512)" fill="#ffffff">
+    <path d="M256 118 L410 198 L256 278 L102 198 Z" />
+    <path d="M160 235 V315 C160 358 352 358 352 315 V235" fill="none" stroke="#ffffff" stroke-width="20" stroke-linecap="round"/>
+    <circle cx="410" cy="262" r="16" />
+    <line x1="410" y1="198" x2="410" y2="262" stroke="#ffffff" stroke-width="10" />
+    <!-- 체크 배지 -->
+    <circle cx="352" cy="352" r="64" fill="#10b981" stroke="#ffffff" stroke-width="8"/>
+    <path d="M326 352 L344 370 L382 332" fill="none" stroke="#ffffff" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+</svg>

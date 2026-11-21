@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" width="192" height="192">
+  <defs>
+    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3b82f6" />
+      <stop offset="100%" stop-color="#1d4ed8" />
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#000" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+  <rect width="192" height="192" rx="42" fill="url(#grad)" />
+  <g filter="url(#shadow)" fill="#ffffff">
+    <!-- 모자/학사모 & 시험지 심볼 -->
+    <path d="M96 44 L154 74 L96 104 L38 74 Z" />
+    <path d="M60 88 V118 C60 134 132 134 132 118 V88" fill="none" stroke="#ffffff" stroke-width="8" stroke-linecap="round"/>
+    <circle cx="154" cy="98" r="6" />
+    <line x1="154" y1="74" x2="154" y2="98" stroke="#ffffff" stroke-width="4" />
+    <!-- 체크마크 배지 -->
+    <circle cx="132" cy="132" r="24" fill="#10b981" />
+    <path d="M122 132 L129 139 L143 125" fill="none" stroke="#ffffff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+</svg>

@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#2563eb">
+  <meta name="description" content="산업기사 자격증 기본정보, 기출문제 CBT, 기출변형 응용문제 완벽 대비 어플리케이션">
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" type="image/svg+xml" href="icons/icon-192.svg">
+  <link rel="apple-touch-icon" href="icons/icon-192.svg">
+  <title>산업기사 자격증 마스터 - 기본정보·기출문제·응용문제</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+  <!-- PWA 가이드라인 필수 배너 -->
+  <aside class="pwa-notice-banner" id="pwaNoticeBanner">
+    <div>
+      📢 <span class="highlight">PWA 설치/업데이트 안내:</span> 캐시가 꼬일 수 있으니 앱 업데이트 시 꼭 기존 앱을 완전히 삭제하고 새로 설치하셔야 합니다.
+    </div>
+    <button class="pwa-notice-close" id="closeNoticeBtn" aria-label="공지 닫기">&times;</button>
+  </aside>
+
+  <!-- 메인 헤더 -->
+  <header class="app-header">
+    <div class="header-container">
+      <div class="brand">
+        <img src="icons/icon-192.svg" alt="앱 로고" class="brand-icon">
+        <h1 class="brand-title">산업기사 마스터</h1>
+      </div>
+      <div class="header-actions">
+        <select id="certSelector" class="cert-select" aria-label="자격증 종목 선택">
+          <!-- JS에서 동적 주입 -->
+        </select>
+        <button id="themeToggleBtn" class="theme-toggle-btn" aria-label="화면 모드 전환">🌙 야간모드</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- 3대 메인 메뉴 네비게이션 -->
+  <nav class="main-nav" aria-label="주요 학습 메뉴">
+    <div class="nav-container">
+      <button class="nav-tab-btn active" data-target="info">
+        <span>📋</span>
+        <span>1. 기본 정보</span>
+      </button>
+      <button class="nav-tab-btn" data-target="past">
+        <span>📝</span>
+        <span>2. 기출문제 풀이</span>
+        <span class="tab-badge" id="pastBadge">CBT</span>
+      </button>
+      <button class="nav-tab-btn" data-target="applied">
+        <span>💡</span>
+        <span>3. 기출변형 응용</span>
+        <span class="tab-badge" style="background:#f3e8ff; color:#7c3aed;">신유형</span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- 메인 콘텐츠 영역 -->
+  <main class="main-content">
+    
+    <!-- ==============================================
+         메뉴 1: 기본정보를 정리해서 보여주는 메뉴
+         ============================================== -->
+    <section id="menu-info" class="content-section active">
+      <div class="sub-tabs" role="tablist">
+        <button class="sub-tab-btn active" data-sub="overview">자격증 개요</button>
+        <button class="sub-tab-btn" data-sub="schedule">시험 일정</button>
+        <button class="sub-tab-btn" data-sub="eligibility">응시 자격 진단</button>
+        <button class="sub-tab-btn" data-sub="criteria">시험 과목 및 합격기준</button>
+        <button class="sub-tab-btn" data-sub="summary">핵심 요약 노트</button>
+      </div>
+
+      <!-- 기본정보 서브 컨텐츠 1: 개요 -->
+      <div id="sub-info-overview" class="sub-info-content">
+        <article class="card">
+          <h2 class="card-title" id="infoCertTitle">정보처리산업기사 개요</h2>
+          <p class="card-subtitle" id="infoCertSub">한국산업인력공단 시행 국가기술자격</p>
+          <div style="display:flex; flex-direction:column; gap:14px; font-size:0.95rem;">
+            <div>
+              <strong>📌 자격 개요:</strong>
+              <p id="infoCertOverview" style="margin-top:4px;"></p>
+            </div>
+            <div>
+              <strong>🚀 진로 및 전망 / 우대사항:</strong>
+              <p id="infoCertCareer" style="margin-top:4px;"></p>
+            </div>
+            <div>
+              <strong>💳 응시 수수료:</strong>
+              <p id="infoCertFee" style="margin-top:4px;"></p>
+            </div>
+          </div>
+        </article>
+      </div>
+
+      <!-- 기본정보 서브 컨텐츠 2: 일정 -->
+      <div id="sub-info-schedule" class="sub-info-content" style="display:none;">
+        <article class="card">
+          <h2 class="card-title">📅 정기 시험 시행 일정</h2>
+          <p class="card-subtitle">한국산업인력공단 Q-Net 공시 기준 정기 산업기사 시험 일정입니다.</p>
+          <div class="custom-table-wrapper">
+            <table class="custom-table">
+              <thead>
+                <tr>
+                  <th>회차 구분</th>
+                  <th>원서 접수</th>
+                  <th>필기시험 (CBT)</th>
+                  <th>합격 발표</th>
+                </tr>
+              </thead>
+              <tbody id="infoScheduleTableBody">
+                <!-- JS 렌더링 -->
+              </tbody>
+            </table>
+          </div>
+        </article>
+      </div>
+
+      <!-- 기본정보 서브 컨텐츠 3: 응시자격 진단 -->
+      <div id="sub-info-eligibility" class="sub-info-content" style="display:none;">
+        <article class="card">
+          <h2 class="card-title">🔍 산업기사 응시 자격 자가진단</h2>
+          <p class="card-subtitle">나의 학력이나 경력이 산업기사 응시 요건을 충족하는지 바로 확인하세요.</p>
+          <div class="eligibility-checker">
+            <h3 style="font-size:0.95rem; margin-bottom:10px;">당신의 현재 학력 및 경력 조건을 선택하세요:</h3>
+            <div id="eligibilityOptions">
+              <!-- JS 렌더링 -->
+            </div>
+            <div id="eligibilityResultBox" class="eligibility-result-box" style="display:none;">
+              <!-- 선택 결과 표시 -->
+            </div>
+          </div>
+        </article>
+      </div>
+
+      <!-- 기본정보 서브 컨텐츠 4: 시험과목 및 합격기준 -->
+      <div id="sub-info-criteria" class="sub-info-content" style="display:none;">
+        <article class="card">
+          <h2 class="card-title">⚖️ 시험 과목 및 합격 기준</h2>
+          <div id="infoCriteriaContainer" style="display:flex; flex-direction:column; gap:16px;">
+            <!-- JS 렌더링 -->
+          </div>
+        </article>
+      </div>
+
+      <!-- 기본정보 서브 컨텐츠 5: 핵심 요약 노트 -->
+      <div id="sub-info-summary" class="sub-info-content" style="display:none;">
+        <article class="card">
+          <h2 class="card-title">📖 과목별 핵심 암기 & 요약 노트</h2>
+          <p class="card-subtitle">시험 직전 반드시 복습해야 할 빈출 개념 족보입니다.</p>
+          <div id="infoSummaryContainer">
+            <!-- JS 렌더링 -->
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <!-- ==============================================
+         메뉴 2: 기출문제를 풀 수 있는 메뉴
+         ============================================== -->
+    <section id="menu-past" class="content-section">
+      <!-- 기출 세션 컨트롤 바 -->
+      <div class="cbt-control-bar">
+        <div class="cbt-meta-info">
+          <span class="exam-mode-badge" id="pastModeBadge">연습 모드 (즉시채점)</span>
+          <span id="pastRoundTitle" style="font-weight:700; font-size:0.95rem;">2024년 1회 기출문제</span>
+        </div>
+        <div style="display:flex; align-items:center; gap:10px;">
+          <div class="timer-box" id="pastTimerBox" style="display:none;">
+            ⏱️ <span id="pastTimerDisplay">20:00</span>
+          </div>
+          <button class="mode-switch-btn" id="togglePastModeBtn">실전 모의고사 모드로 전환</button>
+        </div>
+      </div>
+
+      <!-- OMR 문항 번호 시트 -->
+      <div class="omr-grid-container" id="pastOmrGrid">
+        <!-- JS 렌더링: 1, 2, 3... -->
+      </div>
+
+      <!-- 문제 카드 영역 -->
+      <div id="pastQuestionContainer">
+        <!-- JS 렌더링 -->
+      </div>
+
+      <!-- 결과 리포트 영역 (제출 시 노출) -->
+      <div id="pastResultContainer" style="display:none;">
+        <!-- JS 렌더링 -->
+      </div>
+    </section>
+
+    <!-- ==============================================
+         메뉴 3: 기출문제로 응용문제를 만든 메뉴
+         ============================================== -->
+    <section id="menu-applied" class="content-section">
+      <!-- 응용문제 컨트롤 바 -->
+      <div class="cbt-control-bar" style="border-left: 4px solid #8b5cf6;">
+        <div class="cbt-meta-info">
+          <span class="exam-mode-badge" style="background:#7c3aed;">💡 기출변형·심화</span>
+          <span id="appliedTitle" style="font-weight:700; font-size:0.95rem;">기출변형 핵심 응용 모의고사</span>
+        </div>
+        <div style="font-size:0.85rem; color:var(--text-muted);">
+          기출의 핵심 개념을 꼬거나 수치를 변형한 신유형
+        </div>
+      </div>
+
+      <!-- OMR 문항 번호 시트 -->
+      <div class="omr-grid-container" id="appliedOmrGrid">
+        <!-- JS 렌더링 -->
+      </div>
+
+      <!-- 문제 카드 영역 -->
+      <div id="appliedQuestionContainer">
+        <!-- JS 렌더링 -->
+      </div>
+
+      <!-- 결과 리포트 영역 (제출 시 노출) -->
+      <div id="appliedResultContainer" style="display:none;">
+        <!-- JS 렌더링 -->
+      </div>
+    </section>
+
+  </main>
+
+  <!-- 하단 푸터 -->
+  <footer class="app-footer">
+    <p>산업기사 자격증 학습 시스템 | 하위 호환성 최적화 & 비용 0원 순수 독립 웹앱</p>
+    <p style="margin-top:4px; font-size:0.75rem; color:#94a3b8;">본 어플리케이션은 한국산업인력공단 출제기준을 기반으로 최적화 설계되었습니다.</p>
+  </footer>
+
+  <!-- 데이터 및 앱 스크립트 로드 -->
+  <script src="js/data.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
