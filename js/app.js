@@ -1,50 +1,73 @@
 /**
- * 산업안전산업기사 마스터 웹앱 메인 엔진
+ * 산업안전산업기사 마스터 PRO 웹앱 메인 엔진 (Argon Edition)
  * 순수 Vanilla JS (외부 프레임워크 종속성 0, 높은 하위 호환성)
+ * - 기출 50선 & 기출변형 응용 25선 (과목별 필터링, 셔플, 북마크 영구저장)
+ * - 실제 국가기술자격 합격 판정 알고리즘 (과목당 40점 과락 + 평균 60점 분석)
+ * - 핵심요약노트 실시간 키워드 검색 & 하이라이트
+ * - 스마트 오답노트 (누적 오답 횟수, 과목별 필터, 정답 가리기 토글, 재도전 CBT)
+ * - 키보드 단축키 (1~4 보기 선택, 좌/우 화살표 이동, B 북마크)
  */
 
 (function () {
   'use strict';
 
-  const STORAGE_KEY_WRONG_NOTES = 'industrial_safety_wrong_notes';
+  const STORAGE_KEY_WRONG_NOTES = 'industrial_safety_wrong_notes_v2';
+  const STORAGE_KEY_BOOKMARKS = 'industrial_safety_bookmarks_v2';
   const STORAGE_KEY_THEME = 'industrial_safety_theme';
+
+  // 북마크 로컬스토리지 로드
+  function loadStoredBookmarks() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY_BOOKMARKS);
+      return raw ? new Set(JSON.parse(raw)) : new Set();
+    } catch (e) {
+      return new Set();
+    }
+  }
+
+  function saveStoredBookmarks(bookmarkSet) {
+    try {
+      localStorage.setItem(STORAGE_KEY_BOOKMARKS, JSON.stringify(Array.from(bookmarkSet)));
+    } catch (e) {}
+  }
+
+  const sharedBookmarks = loadStoredBookmarks();
 
   // 1. 상태 관리
   const state = {
     currentMenu: 'info', // 'info' | 'past' | 'applied' | 'wrongNotes'
-    currentSummarySubId: 'sub1', // 'sub1' ~ 'sub5'
+    currentSummarySubId: 'sub1', // 'sub1' ~ 'sub5' | 'all'
+    summarySearchKeyword: '',
     theme: localStorage.getItem(STORAGE_KEY_THEME) || 'light',
 
     pastExam: {
       mode: 'practice', // 'practice' | 'mock'
+      subjectFilter: 'all', // 'all' | 'sub1' ~ 'sub5' | 'bookmark'
+      questions: [],
       currentIndex: 0,
       userAnswers: {},
-      bookmarks: new Set(),
       isSubmitted: false,
-      timerSeconds: 25 * 60,
-      timerInterval: null
+      timerSeconds: 75 * 60,
+      timerInterval: null,
+      isRetakeMode: false
     },
 
     appliedExam: {
       mode: 'practice',
-      currentIndex: 0,
-      userAnswers: {},
-      bookmarks: new Set(),
-      isSubmitted: false
-    },
-
-    // 오답노트 전용 재도전 시험 상태
-    retakeExam: {
-      active: false,
+      subjectFilter: 'all',
       questions: [],
       currentIndex: 0,
       userAnswers: {},
-      bookmarks: new Set(),
       isSubmitted: false
+    },
+
+    wrongNotes: {
+      subjectFilter: 'all',
+      hideExplanations: false
     }
   };
 
-  // 2. DOM 요소
+  // 2. DOM 요소 캐싱
   const dom = {
     pwaNoticeBanner: document.getElementById('pwaNoticeBanner'),
     closeNoticeBtn: document.getElementById('closeNoticeBtn'),
@@ -59,6 +82,7 @@
     },
     // 기본정보 & 요약노트
     subTabBtns: document.querySelectorAll('.sub-tab-btn'),
+    summarySearchInput: document.getElementById('summarySearchInput'),
     subjectChips: document.getElementById('subjectChips'),
     detailedSummaryContainer: document.getElementById('detailedSummaryContainer'),
     infoCertTitle: document.getElementById('infoCertTitle'),
@@ -75,12 +99,19 @@
     pastModeBadge: document.getElementById('pastModeBadge'),
     pastTimerBox: document.getElementById('pastTimerBox'),
     pastTimerDisplay: document.getElementById('pastTimerDisplay'),
+    btnShufflePast: document.getElementById('btnShufflePast'),
     togglePastModeBtn: document.getElementById('togglePastModeBtn'),
+    pastSubjectFilterChips: document.getElementById('pastSubjectFilterChips'),
+    pastProgressBar: document.getElementById('pastProgressBar'),
     pastOmrGrid: document.getElementById('pastOmrGrid'),
     pastQuestionContainer: document.getElementById('pastQuestionContainer'),
     pastResultContainer: document.getElementById('pastResultContainer'),
     // 응용문제
     appliedTitle: document.getElementById('appliedTitle'),
+    btnShuffleApplied: document.getElementById('btnShuffleApplied'),
+    btnResetApplied: document.getElementById('btnResetApplied'),
+    appliedSubjectFilterChips: document.getElementById('appliedSubjectFilterChips'),
+    appliedProgressBar: document.getElementById('appliedProgressBar'),
     appliedOmrGrid: document.getElementById('appliedOmrGrid'),
     appliedQuestionContainer: document.getElementById('appliedQuestionContainer'),
     appliedResultContainer: document.getElementById('appliedResultContainer'),
@@ -88,16 +119,23 @@
     wrongStatsBar: document.getElementById('wrongStatsBar'),
     wrongNotesListContainer: document.getElementById('wrongNotesListContainer'),
     btnRetakeWrongQuestions: document.getElementById('btnRetakeWrongQuestions'),
+    btnToggleAllWrongExplanations: document.getElementById('btnToggleAllWrongExplanations'),
     btnClearAllWrongNotes: document.getElementById('btnClearAllWrongNotes')
   };
 
-  // 3. 오답노트 로컬스토리지 관리
+  // 3. 오답노트 로컬스토리지 관리 (기존 v1 데이터 호환 마이그레이션 포함)
   function getStoredWrongNotes() {
     try {
-      const data = localStorage.getItem(STORAGE_KEY_WRONG_NOTES);
+      let data = localStorage.getItem(STORAGE_KEY_WRONG_NOTES);
+      if (!data) {
+        const legacy = localStorage.getItem('industrial_safety_wrong_notes');
+        if (legacy) {
+          localStorage.setItem(STORAGE_KEY_WRONG_NOTES, legacy);
+          data = legacy;
+        }
+      }
       return data ? JSON.parse(data) : [];
     } catch (e) {
-      console.error('오답노트 읽기 오류:', e);
       return [];
     }
   }
@@ -106,22 +144,27 @@
     try {
       localStorage.setItem(STORAGE_KEY_WRONG_NOTES, JSON.stringify(notes));
       updateWrongBadge();
-    } catch (e) {
-      console.error('오답노트 저장 오류:', e);
-    }
+    } catch (e) {}
   }
 
   function addWrongQuestion(questionObj, userAnswer) {
     const list = getStoredWrongNotes();
     const existingIndex = list.findIndex(item => item.id === questionObj.id);
+    const prevCount = existingIndex >= 0 ? (list[existingIndex].wrongCount || 1) : 0;
+
     const itemData = {
       id: questionObj.id,
+      subjectId: questionObj.subjectId || 'sub1',
       subject: questionObj.subject,
       question: questionObj.question,
       options: questionObj.options,
       answer: questionObj.answer,
       explanation: questionObj.explanation,
+      lawRef: questionObj.lawRef || '',
+      changePoint: questionObj.changePoint || '',
+      originalConcept: questionObj.originalConcept || '',
       userAnswer: userAnswer,
+      wrongCount: prevCount + 1,
       date: new Date().toISOString()
     };
 
@@ -135,9 +178,14 @@
 
   function removeWrongQuestion(questionId) {
     let list = getStoredWrongNotes();
+    const beforeLen = list.length;
     list = list.filter(item => item.id !== questionId);
-    saveStoredWrongNotes(list);
-    renderWrongNotes();
+    if (list.length !== beforeLen) {
+      saveStoredWrongNotes(list);
+      if (state.currentMenu === 'wrongNotes') {
+        renderWrongNotes();
+      }
+    }
   }
 
   function clearAllWrongNotes() {
@@ -155,10 +203,42 @@
     }
   }
 
-  // 4. 초기화 함수
+  // 4. 문제 목록 필터링 및 초기화
+  function buildFilteredQuestions(type) {
+    const sourceQuestions = type === 'past'
+      ? APP_DATA.pastExams[0].questions
+      : APP_DATA.appliedExams[0].questions;
+    const examState = type === 'past' ? state.pastExam : state.appliedExam;
+    const filter = examState.subjectFilter;
+
+    let filtered = sourceQuestions.filter(q => {
+      if (filter === 'all') return true;
+      if (filter === 'bookmark') return sharedBookmarks.has(q.id);
+      return q.subjectId === filter;
+    });
+
+    examState.questions = [...filtered];
+    examState.currentIndex = 0;
+    examState.isSubmitted = false;
+  }
+
+  function shuffleArray(arr) {
+    const copy = [...arr];
+    for (let i = copy.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      const temp = copy[i];
+      copy[i] = copy[j];
+      copy[j] = temp;
+    }
+    return copy;
+  }
+
+  // 5. 앱 초기화
   function initApp() {
     initTheme();
     initPwa();
+    buildFilteredQuestions('past');
+    buildFilteredQuestions('applied');
     bindEventListeners();
     updateWrongBadge();
     renderAll();
@@ -183,7 +263,6 @@
     }
   }
 
-  // 이벤트 바인딩
   function bindEventListeners() {
     // PWA 배너 닫기
     dom.closeNoticeBtn.addEventListener('click', () => {
@@ -201,6 +280,10 @@
     // 메인 메뉴 전환
     dom.navTabBtns.forEach(btn => {
       btn.addEventListener('click', () => {
+        if (btn.dataset.target === 'past' && state.pastExam.isRetakeMode) {
+          state.pastExam.isRetakeMode = false;
+          buildFilteredQuestions('past');
+        }
         switchMainMenu(btn.dataset.target);
       });
     });
@@ -211,6 +294,14 @@
         switchInfoSubTab(btn.dataset.sub);
       });
     });
+
+    // 요약노트 실시간 키워드 검색
+    if (dom.summarySearchInput) {
+      dom.summarySearchInput.addEventListener('input', (e) => {
+        state.summarySearchKeyword = e.target.value.trim();
+        renderDetailedSummary();
+      });
+    }
 
     // 요약노트 과목 칩스 클릭
     if (dom.subjectChips) {
@@ -225,29 +316,117 @@
       });
     }
 
-    // 기출문제 모드 전환 버튼
-    dom.togglePastModeBtn.addEventListener('click', () => {
-      if (state.pastExam.mode === 'practice') {
-        if (confirm('실전 CBT 모의고사 모드로 전환하시겠습니까?\n25분 제한시간 타이머가 시작되며, 최종 제출 시 채점 결과가 공개됩니다.')) {
-          state.pastExam.mode = 'mock';
-          startPastTimer();
-        }
-      } else {
-        if (confirm('연습 모드로 전환하시겠습니까?\n타이머가 멈추고 문제 풀이 시 정답과 해설이 즉시 공개됩니다.')) {
-          state.pastExam.mode = 'practice';
-          stopPastTimer();
-        }
-      }
-      resetExamState('past', false);
+    // 기출문제 과목 필터 칩스
+    if (dom.pastSubjectFilterChips) {
+      const chips = dom.pastSubjectFilterChips.querySelectorAll('.chip-btn');
+      chips.forEach(chip => {
+        chip.addEventListener('click', () => {
+          state.pastExam.isRetakeMode = false;
+          chips.forEach(c => c.classList.remove('active'));
+          chip.classList.add('active');
+          state.pastExam.subjectFilter = chip.dataset.filter;
+          buildFilteredQuestions('past');
+          renderPastExam();
+        });
+      });
+    }
+
+    // 응용문제 과목 필터 칩스
+    if (dom.appliedSubjectFilterChips) {
+      const chips = dom.appliedSubjectFilterChips.querySelectorAll('.chip-btn');
+      chips.forEach(chip => {
+        chip.addEventListener('click', () => {
+          chips.forEach(c => c.classList.remove('active'));
+          chip.classList.add('active');
+          state.appliedExam.subjectFilter = chip.dataset.filter;
+          buildFilteredQuestions('applied');
+          renderAppliedExam();
+        });
+      });
+    }
+
+    // 기출문제 순서 섞기
+    dom.btnShufflePast.addEventListener('click', () => {
+      state.pastExam.questions = shuffleArray(state.pastExam.questions);
+      state.pastExam.currentIndex = 0;
       renderPastExam();
     });
 
-    // 오답노트 전체 비우기
-    dom.btnClearAllWrongNotes.addEventListener('click', clearAllWrongNotes);
+    // 응용문제 순서 섞기 및 초기화
+    dom.btnShuffleApplied.addEventListener('click', () => {
+      state.appliedExam.questions = shuffleArray(state.appliedExam.questions);
+      state.appliedExam.currentIndex = 0;
+      renderAppliedExam();
+    });
 
-    // 오답노트 재도전 풀기
-    dom.btnRetakeWrongQuestions.addEventListener('click', () => {
-      startRetakeWrongExam();
+    dom.btnResetApplied.addEventListener('click', () => {
+      if (confirm('응용문제 풀이 기록을 초기화하고 처음부터 다시 푸시겠습니까?')) {
+        state.appliedExam.userAnswers = {};
+        state.appliedExam.currentIndex = 0;
+        state.appliedExam.isSubmitted = false;
+        renderAppliedExam();
+      }
+    });
+
+    // 기출문제 모드 전환 버튼
+    dom.togglePastModeBtn.addEventListener('click', () => {
+      state.pastExam.isRetakeMode = false;
+      if (state.pastExam.mode === 'practice') {
+        if (confirm('실전 CBT 모의고사 모드로 전환하시겠습니까?\n75분 제한시간 타이머가 작동하며, 최종 제출 시 과목별 과락(40점) 및 합격(평균 60점) 여부가 일괄 채점됩니다.')) {
+          state.pastExam.mode = 'mock';
+          state.pastExam.userAnswers = {};
+          state.pastExam.isSubmitted = false;
+          state.pastExam.currentIndex = 0;
+          startPastTimer();
+        }
+      } else {
+        if (confirm('연습 모드로 전환하시겠습니까?\n타이머가 멈추고 문제 풀이 즉시 정답과 상세 해설이 표시됩니다.')) {
+          state.pastExam.mode = 'practice';
+          state.pastExam.isSubmitted = false;
+          stopPastTimer();
+        }
+      }
+      renderPastExam();
+    });
+
+    // 오답노트 액션
+    dom.btnClearAllWrongNotes.addEventListener('click', clearAllWrongNotes);
+    dom.btnRetakeWrongQuestions.addEventListener('click', startRetakeWrongExam);
+    dom.btnToggleAllWrongExplanations.addEventListener('click', () => {
+      state.wrongNotes.hideExplanations = !state.wrongNotes.hideExplanations;
+      dom.btnToggleAllWrongExplanations.innerHTML = state.wrongNotes.hideExplanations
+        ? '👁️ 정답/해설 모두 보기'
+        : '👁️ 정답/해설 가리기';
+      renderWrongNotes();
+    });
+
+    // 키보드 단축키 지원 (1~4 보기 선택, 좌우 화살표 이동, B 북마크)
+    window.addEventListener('keydown', (e) => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+      if (state.currentMenu !== 'past' && state.currentMenu !== 'applied') return;
+
+      const type = state.currentMenu;
+      const s = type === 'past' ? state.pastExam : state.appliedExam;
+      if (s.isSubmitted || !s.questions.length) return;
+      const currentQ = s.questions[s.currentIndex];
+      if (!currentQ) return;
+
+      if (['1', '2', '3', '4'].includes(e.key)) {
+        const optIdx = parseInt(e.key, 10) - 1;
+        handleSelectOption(type, currentQ, optIdx);
+      } else if (e.key === 'ArrowRight') {
+        if (s.currentIndex < s.questions.length - 1) {
+          s.currentIndex++;
+          renderExamView(type);
+        }
+      } else if (e.key === 'ArrowLeft') {
+        if (s.currentIndex > 0) {
+          s.currentIndex--;
+          renderExamView(type);
+        }
+      } else if (e.key.toLowerCase() === 'b') {
+        toggleBookmark(type, currentQ.id);
+      }
     });
   }
 
@@ -278,7 +457,7 @@
   }
 
   // ============================================================
-  // 1. 기본정보 및 과목별 기출 핵심요약노트 렌더링
+  // 1. 기본정보 및 5과목 기출 핵심요약노트
   // ============================================================
   function renderInfo() {
     const info = APP_DATA.info;
@@ -295,7 +474,7 @@
     info.schedule.forEach(sch => {
       const tr = document.createElement('tr');
       tr.innerHTML = `
-        <td style="font-weight:700; color:var(--primary);">${sch.round}</td>
+        <td style="font-weight:800; color:var(--primary);">${sch.round}</td>
         <td>${sch.apply}</td>
         <td><strong>${sch.exam}</strong></td>
         <td>${sch.result}</td>
@@ -303,7 +482,7 @@
       dom.infoScheduleTableBody.appendChild(tr);
     });
 
-    // 응시자격
+    // 응시자격 진단
     dom.eligibilityOptions.innerHTML = '';
     info.eligibility.forEach((el, idx) => {
       const label = document.createElement('label');
@@ -317,8 +496,8 @@
       label.querySelector('input').addEventListener('change', () => {
         dom.eligibilityResultBox.style.display = 'block';
         dom.eligibilityResultBox.innerHTML = `
-          <div style="color:var(--success); margin-bottom:4px;">✅ <strong>[응시 자격 충족 가능]</strong></div>
-          <div>선택하신 <strong>'${el.type}'</strong> 전형은 Q-Net 서류 심사 시 관련 서류를 제출하시면 필기 응시 자격이 부여됩니다.</div>
+          <div style="color:var(--success); margin-bottom:4px;">✅ <strong>[산업안전산업기사 응시 자격 충족]</strong></div>
+          <div>선택하신 <strong>'${el.type}'</strong> 요건은 Q-Net 응시자격 자가진단 기준을 통과합니다. 필기시험 합격 후 실기 원서접수 전까지 증빙서류(졸업·경력·학점증명서)를 제출하시면 됩니다.</div>
         `;
       });
       dom.eligibilityOptions.appendChild(label);
@@ -328,26 +507,27 @@
     const ws = info.examStructure.written;
     const ps = info.examStructure.practical;
     dom.infoCriteriaContainer.innerHTML = `
-      <div style="background-color:var(--bg-main); padding:16px; border-radius:var(--radius-sm); border-left:4px solid var(--primary);">
-        <h4 style="font-size:1.05rem; margin-bottom:6px; color:var(--primary);">${ws.title}</h4>
+      <div style="background-color:var(--bg-main); padding:18px; border-radius:var(--radius-sm); border-left:4px solid var(--primary);">
+        <h4 style="font-size:1.05rem; margin-bottom:8px; color:var(--primary);">${ws.title}</h4>
         <ul style="padding-left:18px; font-size:0.92rem; display:flex; flex-direction:column; gap:6px;">
-          <li><strong>문항 수 및 시간:</strong> ${ws.questions} (${ws.duration})</li>
-          <li><strong>합격 기준:</strong> <span style="color:var(--danger); font-weight:800;">${ws.passStandard}</span></li>
+          <li><strong>문항 수 및 시험시간:</strong> ${ws.questions} (${ws.duration})</li>
+          <li><strong>합격 기준 (과락 주의):</strong> <span style="color:var(--danger); font-weight:800;">${ws.passStandard}</span></li>
         </ul>
-        <div style="margin-top:12px;">
-          <strong>출제 5개 과목 구성:</strong>
-          <div style="display:flex; flex-direction:column; gap:6px; margin-top:8px;">
+        <div style="margin-top:14px;">
+          <strong>출제 5개 과목 세부 구성:</strong>
+          <div style="display:flex; flex-direction:column; gap:8px; margin-top:8px;">
             ${ws.subjects.map(s => `
-              <div style="background:var(--bg-card); padding:8px 12px; border:1px solid var(--border); border-radius:var(--radius-sm); font-size:0.88rem;">
-                <strong>${s.name}</strong> (${s.questions}문항) - <span style="color:var(--text-muted);">${s.desc}</span>
+              <div style="background:var(--bg-card); padding:10px 14px; border:1px solid var(--border); border-radius:var(--radius-sm); font-size:0.89rem;">
+                <strong style="color:var(--primary);">${s.name}</strong> (${s.questions}문항)
+                <div style="color:var(--text-muted); margin-top:2px;">${s.desc}</div>
               </div>
             `).join('')}
           </div>
         </div>
       </div>
 
-      <div style="background-color:var(--bg-main); padding:16px; border-radius:var(--radius-sm); border-left:4px solid var(--warning);">
-        <h4 style="font-size:1.05rem; margin-bottom:6px; color:var(--warning);">${ps.title}</h4>
+      <div style="background-color:var(--bg-main); padding:18px; border-radius:var(--radius-sm); border-left:4px solid var(--warning);">
+        <h4 style="font-size:1.05rem; margin-bottom:8px; color:var(--warning);">${ps.title}</h4>
         <ul style="padding-left:18px; font-size:0.92rem; display:flex; flex-direction:column; gap:6px;">
           <li><strong>검정 방식:</strong> ${ps.method}</li>
           <li><strong>합격 기준:</strong> <span style="color:var(--success); font-weight:800;">${ps.passStandard}</span></li>
@@ -356,53 +536,81 @@
     `;
   }
 
-  // 과목별 세부 요약집 렌더링
+  // 과목별 세부 요약집 렌더링 (키워드 검색 필터 및 하이라이트 지원)
   function renderDetailedSummary() {
     const info = APP_DATA.info;
     if (!info || !info.detailedSummaries) return;
 
-    const currentSub = info.detailedSummaries.find(s => s.subjectId === state.currentSummarySubId) || info.detailedSummaries[0];
-    if (!currentSub) return;
+    const kw = state.summarySearchKeyword.toLowerCase();
+    let targetSubjects = [];
 
-    dom.detailedSummaryContainer.innerHTML = `
-      <div style="margin-bottom:12px;">
-        <h3 style="font-size:1.1rem; font-weight:800; color:var(--primary); display:flex; align-items:center; gap:6px;">
-          <span>📌</span> ${currentSub.subjectName}
-        </h3>
-      </div>
-      <div style="display:flex; flex-direction:column; gap:14px;">
-        ${currentSub.sections.map(sec => `
-          <div class="summary-section-box">
-            <div class="summary-section-title">
-              <span>🎯</span> ${sec.title}
-            </div>
-            <div class="summary-section-body">${escapeHtml(sec.content)}</div>
+    if (kw.length > 0 || state.currentSummarySubId === 'all') {
+      targetSubjects = info.detailedSummaries;
+    } else {
+      const found = info.detailedSummaries.find(s => s.subjectId === state.currentSummarySubId);
+      targetSubjects = found ? [found] : [info.detailedSummaries[0]];
+    }
+
+    let html = '';
+    let matchCount = 0;
+
+    targetSubjects.forEach(sub => {
+      const matchedSections = sub.sections.filter(sec => {
+        if (!kw) return true;
+        return sec.title.toLowerCase().includes(kw) || sec.content.toLowerCase().includes(kw);
+      });
+
+      if (matchedSections.length === 0) return;
+      matchCount += matchedSections.length;
+
+      html += `
+        <div style="margin-bottom:24px;">
+          <div style="margin-bottom:12px; padding-bottom:6px; border-bottom:2px solid var(--primary);">
+            <h3 style="font-size:1.12rem; font-weight:800; color:var(--primary); display:flex; align-items:center; gap:6px;">
+              <span>📌</span> ${escapeHtml(sub.subjectName)} (${matchedSections.length}개 핵심 테마)
+            </h3>
           </div>
-        `).join('')}
-      </div>
-    `;
+          <div style="display:flex; flex-direction:column; gap:14px;">
+            ${matchedSections.map(sec => `
+              <div class="summary-section-box">
+                <div class="summary-section-title">
+                  <span>🎯</span> ${highlightKeyword(sec.title, state.summarySearchKeyword)}
+                </div>
+                <div class="summary-section-body">${highlightKeyword(sec.content, state.summarySearchKeyword)}</div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `;
+    });
+
+    if (matchCount === 0) {
+      html = `
+        <div class="empty-state-box">
+          <div class="empty-state-icon">🔍</div>
+          <h3 style="font-size:1.1rem; font-weight:800; color:var(--text-main);">'${escapeHtml(state.summarySearchKeyword)}' 검색 결과가 없습니다.</h3>
+          <p style="font-size:0.88rem; margin-top:4px;">다른 키워드(예: 도수율, 안전모, 롤러기, 방폭, 안전난간, 비계)로 검색해 보세요.</p>
+        </div>
+      `;
+    }
+
+    dom.detailedSummaryContainer.innerHTML = html;
+  }
+
+  function highlightKeyword(text, keyword) {
+    const escaped = escapeHtml(text);
+    if (!keyword) return escaped;
+    const safeKw = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(`(${safeKw})`, 'gi');
+    return escaped.replace(regex, '<mark class="search-highlight">$1</mark>');
   }
 
   // ============================================================
-  // 2. 기출문제 메뉴
+  // 2. CBT 시험 엔진 (기출 50선 & 응용 25선 & 오답 재도전 공통)
   // ============================================================
-  function resetExamState(type, clearAnswers = true) {
-    const s = type === 'past' ? state.pastExam : state.appliedExam;
-    s.currentIndex = 0;
-    s.isSubmitted = false;
-    if (clearAnswers) {
-      s.userAnswers = {};
-      s.bookmarks.clear();
-    }
-    if (type === 'past') {
-      stopPastTimer();
-      s.timerSeconds = 25 * 60;
-    }
-  }
-
   function startPastTimer() {
     stopPastTimer();
-    state.pastExam.timerSeconds = 25 * 60;
+    state.pastExam.timerSeconds = 75 * 60;
     dom.pastTimerBox.style.display = 'flex';
     updatePastTimer();
 
@@ -411,7 +619,7 @@
       updatePastTimer();
       if (state.pastExam.timerSeconds <= 0) {
         stopPastTimer();
-        alert('시험 시간이 종료되었습니다! 작성된 답안을 자동 제출합니다.');
+        alert('제한시간 75분이 종료되었습니다! 답안을 자동 제출합니다.');
         submitExam('past');
       }
     }, 1000);
@@ -432,51 +640,119 @@
   }
 
   function renderPastExam() {
-    const exam = APP_DATA.pastExams[0];
-    if (!exam) return;
+    const s = state.pastExam;
+    dom.pastRoundTitle.textContent = s.isRetakeMode
+      ? `🔥 오답노트 집중 재도전 (${s.questions.length}문항)`
+      : `산업안전 정기 기출 CBT (${s.questions.length}문항)`;
 
-    dom.pastRoundTitle.textContent = exam.title;
-    dom.pastModeBadge.textContent = state.pastExam.mode === 'practice' ? '연습 모드 (즉시해설)' : '실전 모의고사 (타이머)';
-    dom.pastModeBadge.style.backgroundColor = state.pastExam.mode === 'practice' ? 'var(--primary)' : 'var(--danger)';
-    dom.togglePastModeBtn.textContent = state.pastExam.mode === 'practice' ? '실전 모의고사 모드로 전환' : '연습 모드로 전환';
+    dom.pastModeBadge.textContent = s.mode === 'practice' ? '연습 모드 (즉시해설)' : '실전 모의고사 (타이머)';
+    dom.pastModeBadge.style.backgroundColor = s.mode === 'practice' ? 'var(--primary)' : 'var(--danger)';
+    dom.togglePastModeBtn.textContent = s.mode === 'practice' ? '⏱️ 실전 모의고사로 전환' : '📖 연습 모드로 전환';
+    dom.pastSubjectFilterChips.style.display = s.isRetakeMode ? 'none' : 'flex';
 
-    if (state.pastExam.isSubmitted) {
-      dom.pastQuestionContainer.style.display = 'none';
-      dom.pastResultContainer.style.display = 'block';
-      renderExamResult('past');
+    renderExamView('past');
+  }
+
+  function renderAppliedExam() {
+    const s = state.appliedExam;
+    dom.appliedTitle.textContent = `산업안전 기출변형·복합 고난도 챌린지 (${s.questions.length}문항)`;
+    renderExamView('applied');
+  }
+
+  function renderExamView(type) {
+    const s = type === 'past' ? state.pastExam : state.appliedExam;
+    const qContainer = type === 'past' ? dom.pastQuestionContainer : dom.appliedQuestionContainer;
+    const rContainer = type === 'past' ? dom.pastResultContainer : dom.appliedResultContainer;
+    const omrEl = type === 'past' ? dom.pastOmrGrid : dom.appliedOmrGrid;
+    const progEl = type === 'past' ? dom.pastProgressBar : dom.appliedProgressBar;
+
+    if (s.questions.length === 0) {
+      progEl.style.display = 'none';
+      omrEl.innerHTML = '';
+      rContainer.style.display = 'none';
+      qContainer.style.display = 'block';
+      qContainer.innerHTML = `
+        <div class="card empty-state-box">
+          <div class="empty-state-icon">⭐</div>
+          <h3 style="font-size:1.1rem; font-weight:800; color:var(--text-main);">해당 필터에 표시할 문항이 없습니다.</h3>
+          <p style="font-size:0.88rem; margin-top:6px;">문제를 풀면서 우측 상단의 [☆ 북마크] 버튼을 누르면 북마크 전용 필터에서 모아볼 수 있습니다.</p>
+        </div>
+      `;
+      return;
+    }
+
+    progEl.style.display = 'flex';
+    renderProgressBar(type);
+
+    if (s.isSubmitted) {
+      qContainer.style.display = 'none';
+      rContainer.style.display = 'block';
+      renderOmrGrid(type);
+      renderExamResult(type);
     } else {
-      dom.pastQuestionContainer.style.display = 'block';
-      dom.pastResultContainer.style.display = 'none';
-      renderQuestionCard('past');
-      renderOmrGrid('past');
+      qContainer.style.display = 'block';
+      rContainer.style.display = 'none';
+      renderOmrGrid(type);
+      renderQuestionCard(type);
     }
   }
 
+  function renderProgressBar(type) {
+    const s = type === 'past' ? state.pastExam : state.appliedExam;
+    const progEl = type === 'past' ? dom.pastProgressBar : dom.appliedProgressBar;
+    const total = s.questions.length;
+    let answeredCount = 0;
+    let correctCount = 0;
+
+    s.questions.forEach(q => {
+      if (s.userAnswers[q.id] !== undefined) {
+        answeredCount++;
+        if (s.userAnswers[q.id] === q.answer) correctCount++;
+      }
+    });
+
+    const pct = total > 0 ? Math.round((answeredCount / total) * 100) : 0;
+    const accPct = answeredCount > 0 ? Math.round((correctCount / answeredCount) * 100) : 0;
+
+    progEl.innerHTML = `
+      <div class="progress-meta-row">
+        <span>📊 풀이 진행률: <strong style="color:var(--primary);">${answeredCount} / ${total}문항 (${pct}%)</strong></span>
+        <span>${s.mode === 'practice' || s.isSubmitted ? `🎯 실시간 정답률: <strong style="color:var(--primary);">${accPct}%</strong>` : '⏱️ 실전 모의고사 진행 중'}</span>
+      </div>
+      <div class="progress-track">
+        <div class="progress-fill" style="width:${pct}%;"></div>
+      </div>
+    `;
+  }
+
   function renderOmrGrid(type) {
-    const exam = type === 'past' ? APP_DATA.pastExams[0] : (type === 'applied' ? APP_DATA.appliedExams[0] : state.retakeExam);
-    const s = type === 'past' ? state.pastExam : (type === 'applied' ? state.appliedExam : state.retakeExam);
+    const s = type === 'past' ? state.pastExam : state.appliedExam;
     const gridEl = type === 'past' ? dom.pastOmrGrid : dom.appliedOmrGrid;
 
     gridEl.innerHTML = '';
-    exam.questions.forEach((q, idx) => {
+    s.questions.forEach((q, idx) => {
       const btn = document.createElement('button');
       btn.className = 'omr-num-btn';
       btn.textContent = idx + 1;
 
       if (idx === s.currentIndex) btn.classList.add('current');
       if (s.userAnswers[q.id] !== undefined) btn.classList.add('answered');
-      if (s.bookmarks && s.bookmarks.has(q.id)) btn.classList.add('bookmarked');
+      if (sharedBookmarks.has(q.id)) btn.classList.add('bookmarked');
 
-      if (s.isSubmitted) {
+      if ((s.mode === 'practice' && s.userAnswers[q.id] !== undefined) || s.isSubmitted) {
         if (s.userAnswers[q.id] === q.answer) {
           btn.classList.add('correct');
-        } else {
+        } else if (s.userAnswers[q.id] !== undefined) {
           btn.classList.add('incorrect');
         }
       }
 
       btn.addEventListener('click', () => {
         s.currentIndex = idx;
+        if (s.isSubmitted) {
+          const qContainer = type === 'past' ? dom.pastQuestionContainer : dom.appliedQuestionContainer;
+          qContainer.style.display = 'block';
+        }
         renderQuestionCard(type);
         renderOmrGrid(type);
       });
@@ -484,26 +760,52 @@
     });
   }
 
-  function renderQuestionCard(type) {
-    const exam = type === 'past' ? APP_DATA.pastExams[0] : (type === 'applied' ? APP_DATA.appliedExams[0] : state.retakeExam);
-    const s = type === 'past' ? state.pastExam : (type === 'applied' ? state.appliedExam : state.retakeExam);
-    const container = type === 'past' ? dom.pastQuestionContainer : (type === 'applied' ? dom.appliedQuestionContainer : dom.pastQuestionContainer);
-    const totalQ = exam.questions.length;
-    const q = exam.questions[s.currentIndex];
+  function toggleBookmark(type, questionId) {
+    if (sharedBookmarks.has(questionId)) {
+      sharedBookmarks.delete(questionId);
+    } else {
+      sharedBookmarks.add(questionId);
+    }
+    saveStoredBookmarks(sharedBookmarks);
+    renderExamView(type);
+  }
 
+  function handleSelectOption(type, q, optIdx) {
+    const s = type === 'past' ? state.pastExam : state.appliedExam;
+    if (s.isSubmitted) return;
+
+    s.userAnswers[q.id] = optIdx;
+
+    if (s.mode === 'practice') {
+      if (optIdx !== q.answer) {
+        addWrongQuestion(q, optIdx);
+      } else if (s.isRetakeMode) {
+        // 오답 재도전 모드에서 맞추면 오답노트에서 자동 마스터 제거
+        removeWrongQuestion(q.id);
+      }
+    }
+
+    renderExamView(type);
+  }
+
+  function renderQuestionCard(type) {
+    const s = type === 'past' ? state.pastExam : state.appliedExam;
+    const container = type === 'past' ? dom.pastQuestionContainer : dom.appliedQuestionContainer;
+    const totalQ = s.questions.length;
+    const q = s.questions[s.currentIndex];
     if (!q) return;
 
-    const isBookmarked = s.bookmarks && s.bookmarks.has(q.id);
+    const isBookmarked = sharedBookmarks.has(q.id);
     const selectedOption = s.userAnswers[q.id];
     const isAnswered = selectedOption !== undefined;
     const showExplanation = (s.mode === 'practice' && isAnswered) || s.isSubmitted;
 
     let appliedIndicatorHtml = '';
-    if (type === 'applied' && q.changePoint) {
+    if (q.changePoint) {
       appliedIndicatorHtml = `
         <div class="applied-indicator-box">
-          <div><span class="label">🎯 원본 기출 개념:</span> ${q.originalConcept || ''}</div>
-          <div style="margin-top:4px;"><span class="label">⚡ 변형 포인트:</span> <strong>${q.changePoint}</strong></div>
+          <div><span class="label">🎯 원본 기출 개념:</span> ${escapeHtml(q.originalConcept || '')}</div>
+          <div style="margin-top:4px;"><span class="label">⚡ 고난도 변형 포인트:</span> <strong>${escapeHtml(q.changePoint)}</strong></div>
         </div>
       `;
     }
@@ -511,18 +813,20 @@
     container.innerHTML = `
       <div class="question-card">
         <div class="question-header">
-          <div style="display:flex; align-items:center; gap:8px;">
-            <span class="question-tag">${q.subject}</span>
-            <span style="font-weight:700; color:var(--text-muted); font-size:0.9rem;">문항 ${s.currentIndex + 1} / ${totalQ}</span>
+          <div style="display:flex; align-items:center; flex-wrap:wrap; gap:8px;">
+            <span class="question-tag">${escapeHtml(q.subject)}</span>
+            ${q.freq ? `<span class="freq-badge">🔥 ${escapeHtml(q.freq)}</span>` : ''}
+            ${q.lawRef ? `<span class="law-ref-badge">📌 ${escapeHtml(q.lawRef)}</span>` : ''}
+            <span style="font-weight:800; color:var(--text-muted); font-size:0.88rem;">문항 ${s.currentIndex + 1} / ${totalQ}</span>
           </div>
-          <button class="bookmark-toggle-btn ${isBookmarked ? 'active' : ''}" id="btnBookmark" title="문제 보관">
-            ${isBookmarked ? '★' : '☆'}
+          <button class="bookmark-toggle-btn ${isBookmarked ? 'active' : ''}" id="btnBookmark" title="단축키 B">
+            <span>${isBookmarked ? '★ 북마크됨' : '☆ 북마크'}</span>
           </button>
         </div>
 
         ${appliedIndicatorHtml}
 
-        <div class="question-text">${escapeHtml(q.question)}</div>
+        <div class="question-text">${s.currentIndex + 1}. ${escapeHtml(q.question)}</div>
 
         <div class="options-list" id="optionsList">
           ${q.options.map((opt, optIdx) => {
@@ -541,7 +845,7 @@
               <div class="${itemClass}" data-opt-idx="${optIdx}">
                 <div class="option-num">${optIdx + 1}</div>
                 <div style="flex:1;">${escapeHtml(opt)}</div>
-                ${showExplanation && optIdx === q.answer ? '<span style="color:var(--success); font-weight:800;">✓ 정답</span>' : ''}
+                ${showExplanation && optIdx === q.answer ? '<span style="color:var(--success); font-weight:800; flex-shrink:0;">✓ 정답</span>' : ''}
               </div>
             `;
           }).join('')}
@@ -550,7 +854,10 @@
         ${showExplanation ? `
           <div class="explanation-box">
             <div class="explanation-title">
-              💡 ${selectedOption === q.answer ? '<span style="color:var(--success);">정답입니다!</span>' : '<span style="color:var(--danger);">오답입니다. (오답노트에 자동 저장됨)</span>'} 정답: ${q.answer + 1}번
+              💡 ${selectedOption === q.answer
+                ? '<span style="color:var(--success);">정답입니다! 완벽하게 이해하셨습니다.</span>'
+                : '<span style="color:var(--danger);">오답입니다. (스마트 오답노트에 자동 등록되었습니다)</span>'}
+              <span style="margin-left:auto; font-size:0.88rem;">정답: ${q.answer + 1}번</span>
             </div>
             <div style="white-space:pre-wrap;">${escapeHtml(q.explanation)}</div>
           </div>
@@ -562,79 +869,59 @@
           </button>
           
           <div style="display:flex; gap:8px;">
-            ${s.currentIndex === totalQ - 1 ? `
-              <button class="btn btn-success" id="btnSubmit">
-                시험 완료 및 제출 (채점)
-              </button>
-            ` : `
+            <button class="btn btn-success" id="btnSubmitNow">
+              📊 채점 및 과락 분석 리포트
+            </button>
+            ${s.currentIndex < totalQ - 1 ? `
               <button class="btn btn-primary" id="btnNext">
                 다음 문항 ▶
               </button>
-            `}
+            ` : ''}
           </div>
         </div>
       </div>
     `;
 
-    // 북마크
+    // 북마크 토글
     container.querySelector('#btnBookmark').addEventListener('click', () => {
-      if (s.bookmarks.has(q.id)) s.bookmarks.delete(q.id);
-      else s.bookmarks.add(q.id);
-      renderQuestionCard(type);
-      renderOmrGrid(type);
+      toggleBookmark(type, q.id);
     });
 
-    // 보기 클릭
+    // 보기 선택
     container.querySelectorAll('.option-item').forEach(el => {
       el.addEventListener('click', () => {
-        if (s.isSubmitted) return;
         const optIdx = parseInt(el.dataset.optIdx, 10);
-        s.userAnswers[q.id] = optIdx;
-
-        // 연습모드에서 틀린 경우 오답노트에 실시간 저장
-        if (s.mode === 'practice') {
-          if (optIdx !== q.answer) {
-            addWrongQuestion(q, optIdx);
-          } else {
-            // 맞추었으면 오답노트에서 자동 제거 (재도전 시 마스터 처리)
-            removeWrongQuestion(q.id);
-          }
-        }
-
-        renderQuestionCard(type);
-        renderOmrGrid(type);
+        handleSelectOption(type, q, optIdx);
       });
     });
 
-    // 이전
+    // 이전 문항
     const btnPrev = container.querySelector('#btnPrev');
     if (btnPrev && s.currentIndex > 0) {
       btnPrev.addEventListener('click', () => {
         s.currentIndex--;
-        renderQuestionCard(type);
-        renderOmrGrid(type);
+        renderExamView(type);
       });
     }
 
-    // 다음
+    // 다음 문항
     const btnNext = container.querySelector('#btnNext');
     if (btnNext) {
       btnNext.addEventListener('click', () => {
         if (s.currentIndex < totalQ - 1) {
           s.currentIndex++;
-          renderQuestionCard(type);
-          renderOmrGrid(type);
+          renderExamView(type);
         }
       });
     }
 
-    // 제출
-    const btnSubmit = container.querySelector('#btnSubmit');
-    if (btnSubmit) {
-      btnSubmit.addEventListener('click', () => {
-        const unanswered = exam.questions.filter(item => s.userAnswers[item.id] === undefined).length;
+    // 채점 및 결과 리포트
+    const btnSubmitNow = container.querySelector('#btnSubmitNow');
+    if (btnSubmitNow) {
+      btnSubmitNow.addEventListener('click', () => {
+        const unanswered = s.questions.filter(item => s.userAnswers[item.id] === undefined).length;
         if (unanswered > 0) {
-          if (!confirm(`아직 풀지 않은 문제가 ${unanswered}문항 있습니다.\n정말 제출하시겠습니까?`)) {
+          if (!confirm(`아직 풀지 않은 문항이 ${unanswered}문항 있습니다.\n현재 상태로 채점 및 과락 분석을 진행하시겠습니까?`)) {
             return;
           }
         }
@@ -644,96 +931,135 @@
   }
 
   function submitExam(type) {
-    const exam = type === 'past' ? APP_DATA.pastExams[0] : (type === 'applied' ? APP_DATA.appliedExams[0] : state.retakeExam);
-    const s = type === 'past' ? state.pastExam : (type === 'applied' ? state.appliedExam : state.retakeExam);
-
+    const s = type === 'past' ? state.pastExam : state.appliedExam;
     if (type === 'past') stopPastTimer();
+
     s.isSubmitted = true;
     s.currentIndex = 0;
 
-    // 틀린 문제들을 오답노트에 자동 등록
-    exam.questions.forEach(q => {
+    // 채점 시 틀린 문항을 오답노트에 저장
+    s.questions.forEach(q => {
       const userAns = s.userAnswers[q.id];
       if (userAns !== undefined && userAns !== q.answer) {
         addWrongQuestion(q, userAns);
-      } else if (userAns === q.answer) {
-        // 맞추면 오답노트 목록에서 삭제
+      } else if (userAns === q.answer && s.isRetakeMode) {
         removeWrongQuestion(q.id);
       }
     });
 
-    if (type === 'past') renderPastExam();
-    else if (type === 'applied') renderAppliedExam();
-    else renderExamResult('retake');
+    renderExamView(type);
   }
 
+  // 실제 국가기술자격 합격 판정 (과목당 40점 과락 체크 + 전 과목 평균 60점 체크)
   function renderExamResult(type) {
-    const exam = type === 'past' ? APP_DATA.pastExams[0] : (type === 'applied' ? APP_DATA.appliedExams[0] : state.retakeExam);
-    const s = type === 'past' ? state.pastExam : (type === 'applied' ? state.appliedExam : state.retakeExam);
-    const container = type === 'past' ? dom.pastResultContainer : (type === 'applied' ? dom.appliedResultContainer : dom.pastResultContainer);
+    const s = type === 'past' ? state.pastExam : state.appliedExam;
+    const container = type === 'past' ? dom.pastResultContainer : dom.appliedResultContainer;
 
     let correctCount = 0;
     const wrongQuestions = [];
+    const subjectMap = {};
 
-    exam.questions.forEach(q => {
+    s.questions.forEach(q => {
+      const subName = q.subject;
+      if (!subjectMap[subName]) {
+        subjectMap[subName] = { total: 0, correct: 0 };
+      }
+      subjectMap[subName].total++;
+
       const userAns = s.userAnswers[q.id];
-      if (userAns === q.answer) correctCount++;
-      else wrongQuestions.push(q);
+      if (userAns === q.answer) {
+        correctCount++;
+        subjectMap[subName].correct++;
+      } else {
+        wrongQuestions.push(q);
+      }
     });
 
-    const totalCount = exam.questions.length;
-    const score = Math.round((correctCount / totalCount) * 100);
-    const isPassed = score >= 60;
+    const totalCount = s.questions.length;
+    const avgScore = totalCount > 0 ? Math.round((correctCount / totalCount) * 100) : 0;
+
+    // 과목별 과락(40점 미만) 여부 판정
+    const failedSubjects = [];
+    const subjectBreakdownHtml = Object.keys(subjectMap).map(subName => {
+      const st = subjectMap[subName];
+      const subScore = Math.round((st.correct / st.total) * 100);
+      const isSubFail = subScore < 40;
+      if (isSubFail) failedSubjects.push(subName);
+
+      const barColor = isSubFail ? 'var(--danger)' : (subScore >= 60 ? 'var(--success)' : 'var(--warning)');
+      return `
+        <div class="breakdown-row">
+          <div class="breakdown-header">
+            <span>${escapeHtml(subName)} (${st.correct}/${st.total}문항)</span>
+            <span style="color:${barColor};">${subScore}점 ${isSubFail ? '⚠️ [과락 - 40점 미만]' : '✅ [통과]'}</span>
+          </div>
+          <div class="breakdown-bar-bg">
+            <div class="breakdown-bar-fill" style="width:${subScore}%; background-color:${barColor};"></div>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    const isAvgPass = avgScore >= 60;
+    const isFinalPass = isAvgPass && failedSubjects.length === 0;
+
+    let statusMessage = '';
+    if (isFinalPass) {
+      statusMessage = '축하합니다! 전 과목 40점 이상(과락 없음) 및 총 평균 60점 이상으로 최종 합격 기준을 통과했습니다!';
+    } else if (isAvgPass && failedSubjects.length > 0) {
+      statusMessage = `평균 점수는 ${avgScore}점으로 60점을 넘었으나, [${failedSubjects.join(', ')}] 과목이 40점 미만 과락이어서 불합격 판정되었습니다.`;
+    } else {
+      statusMessage = `총 평균 ${avgScore}점으로 합격 기준(60점)에 미달하였습니다. 스마트 오답노트에서 취약 과목을 복습하세요!`;
+    }
 
     container.innerHTML = `
       <div class="card result-card">
-        <div class="result-badge ${isPassed ? 'pass' : 'fail'}">
-          ${isPassed ? '🎉 산업안전 합격선 통과!' : '⚠️ 과락 및 기준 점수 미달'}
+        <div class="result-badge ${isFinalPass ? 'pass' : 'fail'}">
+          ${isFinalPass ? '🎉 산업안전산업기사 합격 기준 통과!' : (isAvgPass ? '⚠️ 과목 과락(40점 미만) 불합격' : '⚠️ 평균 점수 미달 불합격')}
         </div>
         <div class="result-score">
-          ${score}<span> / 100점</span>
+          ${avgScore}<span> / 100점</span>
         </div>
-        <p style="color:var(--text-muted); font-size:0.95rem;">
-          ${isPassed ? '축하합니다! 합격 기준인 60점을 달성하였습니다.' : '합격선(60점)에 미달하였습니다. 오답 노트로 이동하여 틀린 문제를 다시 복습하세요!'}
+        <p style="color:var(--text-muted); font-size:0.95rem; max-width:640px; margin:0 auto;">
+          ${escapeHtml(statusMessage)}
         </p>
 
         <div class="result-stats-grid">
           <div class="stat-item">
-            <div class="stat-value" style="color:var(--primary);">${totalCount}</div>
-            <div class="stat-label">총 문항 수</div>
+            <div class="stat-value" style="color:var(--primary);">${totalCount}문항</div>
+            <div class="stat-label">응시 문항 수</div>
           </div>
           <div class="stat-item">
-            <div class="stat-value" style="color:var(--success);">${correctCount}</div>
+            <div class="stat-value" style="color:var(--success);">${correctCount}문항</div>
             <div class="stat-label">정답 문항</div>
           </div>
           <div class="stat-item">
-            <div class="stat-value" style="color:var(--danger);">${wrongQuestions.length}</div>
-            <div class="stat-label">오답 문항 (노트 자동저장)</div>
+            <div class="stat-value" style="color:var(--danger);">${wrongQuestions.length}문항</div>
+            <div class="stat-label">오답 (오답노트 자동저장)</div>
           </div>
         </div>
 
-        <div style="display:flex; justify-content:center; gap:12px; margin-top:20px; flex-wrap:wrap;">
-          <button class="btn btn-primary" id="btnReviewAll">전체 문항 해설 보기</button>
-          <button class="btn btn-secondary" id="btnGoToWrongNotes">🚨 스마트 오답노트 확인</button>
-          <button class="btn btn-secondary" id="btnRestart">새로 다시 풀기</button>
+        <!-- 과목별 득점 및 과락 정밀 분석 차트 -->
+        <div class="subject-breakdown-box">
+          <h4 style="font-size:1rem; font-weight:800; margin-bottom:14px; color:var(--text-main);">
+            📊 과목별 득점 및 과락(40점 기준) 정밀 분석
+          </h4>
+          ${subjectBreakdownHtml}
+        </div>
+
+        <div style="display:flex; justify-content:center; gap:12px; margin-top:24px; flex-wrap:wrap;">
+          <button class="btn btn-primary" id="btnReviewAll">📖 문항별 상세 해설 보기</button>
+          <button class="btn btn-secondary" id="btnGoToWrongNotes">🚨 스마트 오답노트로 이동</button>
+          <button class="btn btn-secondary" id="btnRestart">🔄 새로 다시 풀기</button>
         </div>
       </div>
     `;
 
     container.querySelector('#btnReviewAll').addEventListener('click', () => {
-      s.isSubmitted = true;
-      s.currentIndex = 0;
-      if (type === 'past') {
-        dom.pastResultContainer.style.display = 'none';
-        dom.pastQuestionContainer.style.display = 'block';
-        renderQuestionCard('past');
-        renderOmrGrid('past');
-      } else {
-        dom.appliedResultContainer.style.display = 'none';
-        dom.appliedQuestionContainer.style.display = 'block';
-        renderQuestionCard('applied');
-        renderOmrGrid('applied');
-      }
+      const qContainer = type === 'past' ? dom.pastQuestionContainer : dom.appliedQuestionContainer;
+      qContainer.style.display = 'block';
+      renderQuestionCard(type);
+      qContainer.scrollIntoView({ behavior: 'smooth' });
     });
 
     container.querySelector('#btnGoToWrongNotes').addEventListener('click', () => {
@@ -741,103 +1067,148 @@
     });
 
     container.querySelector('#btnRestart').addEventListener('click', () => {
-      resetExamState(type, true);
-      if (type === 'past') renderPastExam();
-      else renderAppliedExam();
+      s.userAnswers = {};
+      s.currentIndex = 0;
+      s.isSubmitted = false;
+      if (type === 'past' && s.mode === 'mock') {
+        startPastTimer();
+      }
+      renderExamView(type);
     });
   }
 
   // ============================================================
-  // 3. 기출변형 응용문제 메뉴
-  // ============================================================
-  function renderAppliedExam() {
-    const exam = APP_DATA.appliedExams[0];
-    if (!exam) return;
-
-    dom.appliedTitle.textContent = exam.title;
-
-    if (state.appliedExam.isSubmitted) {
-      dom.appliedQuestionContainer.style.display = 'none';
-      dom.appliedResultContainer.style.display = 'block';
-      renderExamResult('applied');
-    } else {
-      dom.appliedQuestionContainer.style.display = 'block';
-      dom.appliedResultContainer.style.display = 'none';
-      renderQuestionCard('applied');
-      renderOmrGrid('applied');
-    }
-  }
-
-  // ============================================================
-  // 4. 스마트 오답노트 메뉴 (신규!)
+  // 3. 스마트 오답노트 메뉴 (과목별 필터, 오답 횟수, 해설 가리기)
   // ============================================================
   function renderWrongNotes() {
-    const list = getStoredWrongNotes();
+    const allList = getStoredWrongNotes();
     updateWrongBadge();
 
-    // 오답 통계 요약 칩
+    // 과목별 통계 산출
     const subjectStats = {};
-    list.forEach(item => {
-      subjectStats[item.subject] = (subjectStats[item.subject] || 0) + 1;
+    allList.forEach(item => {
+      const subId = item.subjectId || 'sub1';
+      if (!subjectStats[subId]) {
+        subjectStats[subId] = { name: item.subject, count: 0 };
+      }
+      subjectStats[subId].count++;
     });
 
+    const currentFilter = state.wrongNotes.subjectFilter;
+    const filteredList = currentFilter === 'all'
+      ? allList
+      : allList.filter(item => (item.subjectId || 'sub1') === currentFilter);
+
+    // 과목 필터 칩스 렌더링
     dom.wrongStatsBar.innerHTML = `
-      <div class="wrong-stat-chip" style="background:var(--primary-light); color:var(--primary); font-weight:800;">
-        총 오답: ${list.length}문항
-      </div>
-      ${Object.keys(subjectStats).map(sub => `
-        <div class="wrong-stat-chip">
-          ${sub}: <strong>${subjectStats[sub]}</strong>
-        </div>
+      <button class="wrong-stat-chip ${currentFilter === 'all' ? 'active' : ''}" data-w-filter="all">
+        전체 오답 (${allList.length})
+      </button>
+      ${Object.keys(subjectStats).map(subId => `
+        <button class="wrong-stat-chip ${currentFilter === subId ? 'active' : ''}" data-w-filter="${subId}">
+          ${escapeHtml(subjectStats[subId].name)} (${subjectStats[subId].count})
+        </button>
       `).join('')}
     `;
 
-    // 오답 목록 렌더링
-    if (list.length === 0) {
+    dom.wrongStatsBar.querySelectorAll('.wrong-stat-chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        state.wrongNotes.subjectFilter = chip.dataset.wFilter;
+        renderWrongNotes();
+      });
+    });
+
+    if (allList.length === 0) {
       dom.wrongNotesListContainer.innerHTML = `
         <div class="empty-state-box">
           <div class="empty-state-icon">🎉</div>
-          <h3 style="font-size:1.15rem; font-weight:800; color:var(--text-main); margin-bottom:6px;">저장된 오답이 없습니다!</h3>
-          <p style="font-size:0.9rem;">기출문제나 응용문제를 풀면 틀린 문제가 여기에 자동으로 누적됩니다.</p>
-          <button class="btn btn-primary" style="margin-top:16px;" onclick="document.querySelector('[data-target=past]').click();">
-            기출문제 풀러 가기 📝
-          </button>
+          <h3 style="font-size:1.15rem; font-weight:800; color:var(--text-main); margin-bottom:6px;">현재 저장된 오답이 없습니다!</h3>
+          <p style="font-size:0.9rem;">기출문제(50선)나 기출변형 응용문제(25선)를 풀며 틀린 문제가 발생하면 이곳에 자동으로 기록됩니다.</p>
+          <div style="display:flex; justify-content:center; gap:10px; margin-top:16px;">
+            <button class="btn btn-primary" id="btnEmptyGoPast">📝 기출문제 50선 풀기</button>
+            <button class="btn btn-secondary" id="btnEmptyGoApplied">💡 기출변형 25선 풀기</button>
+          </div>
         </div>
       `;
       dom.btnRetakeWrongQuestions.style.display = 'none';
+      dom.btnToggleAllWrongExplanations.style.display = 'none';
       dom.btnClearAllWrongNotes.style.display = 'none';
+
+      const goPast = dom.wrongNotesListContainer.querySelector('#btnEmptyGoPast');
+      const goApplied = dom.wrongNotesListContainer.querySelector('#btnEmptyGoApplied');
+      if (goPast) goPast.addEventListener('click', () => switchMainMenu('past'));
+      if (goApplied) goApplied.addEventListener('click', () => switchMainMenu('applied'));
       return;
     }
 
     dom.btnRetakeWrongQuestions.style.display = 'inline-flex';
+    dom.btnToggleAllWrongExplanations.style.display = 'inline-flex';
     dom.btnClearAllWrongNotes.style.display = 'inline-flex';
 
-    dom.wrongNotesListContainer.innerHTML = list.map((item, idx) => `
+    // 누적 오답 횟수가 많은 순으로 정렬
+    const sortedList = [...filteredList].sort((a, b) => (b.wrongCount || 1) - (a.wrongCount || 1));
+
+    dom.wrongNotesListContainer.innerHTML = sortedList.map((item, idx) => `
       <div class="wrong-card">
         <div class="wrong-card-header">
-          <span class="question-tag">${item.subject}</span>
+          <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+            <span class="question-tag">${escapeHtml(item.subject)}</span>
+            <span class="wrong-count-pill">🔥 누적 ${item.wrongCount || 1}회 틀림</span>
+            ${item.lawRef ? `<span class="law-ref-badge">📌 ${escapeHtml(item.lawRef)}</span>` : ''}
+          </div>
           <button class="btn-remove-wrong" data-remove-id="${item.id}">
-            ✓ 마스터 (삭제)
+            ✓ 암기 완료 (마스터 삭제)
           </button>
         </div>
 
-        <div style="font-size:1.05rem; font-weight:700; margin-bottom:14px; line-height:1.6;">
+        <div style="font-size:1.06rem; font-weight:700; margin-bottom:14px; line-height:1.6;">
           ${idx + 1}. ${escapeHtml(item.question)}
         </div>
 
-        <div style="font-size:0.88rem; color:var(--danger); font-weight:700; margin-bottom:10px;">
-          • 내가 선택한 답: ${item.userAnswer !== undefined ? (item.userAnswer + 1) + '번' : '미응답'} ❌ 
-          <span style="color:var(--success); margin-left:8px;">• 정답: ${(item.answer + 1)}번 ✅</span>
+        <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:14px;">
+          ${item.options.map((opt, oIdx) => {
+            const isCorrect = oIdx === item.answer;
+            const isUserWrong = oIdx === item.userAnswer && !isCorrect;
+            let bg = 'var(--bg-main)';
+            let border = 'var(--border)';
+            let color = 'var(--text-main)';
+
+            if (!state.wrongNotes.hideExplanations) {
+              if (isCorrect) {
+                bg = 'var(--success-bg)';
+                border = 'var(--success)';
+                color = 'var(--success)';
+              } else if (isUserWrong) {
+                bg = 'var(--danger-bg)';
+                border = 'var(--danger)';
+                color = 'var(--danger)';
+              }
+            }
+
+            return `
+              <div style="padding:10px 14px; border-radius:var(--radius-sm); border:1px solid ${border}; background:${bg}; color:${color}; font-size:0.92rem; font-weight:${isCorrect && !state.wrongNotes.hideExplanations ? '800' : '500'};">
+                ${oIdx + 1}) ${escapeHtml(opt)}
+                ${!state.wrongNotes.hideExplanations && isCorrect ? ' <strong>[✓ 정답]</strong>' : ''}
+                ${!state.wrongNotes.hideExplanations && isUserWrong ? ' <strong>[❌ 내가 고른 오답]</strong>' : ''}
+              </div>
+            `;
+          }).join('')}
         </div>
 
-        <div class="explanation-box" style="margin-top:8px;">
-          <div class="explanation-title">💡 상세 해설 & 암기 포인트:</div>
-          <div style="white-space:pre-wrap;">${escapeHtml(item.explanation)}</div>
-        </div>
+        ${state.wrongNotes.hideExplanations ? `
+          <div style="text-align:center; padding:10px; background:var(--bg-main); border-radius:var(--radius-sm); font-size:0.88rem; color:var(--text-muted);">
+            🔒 정답과 해설이 가려져 있습니다. 상단의 [정답/해설 모두 보기]를 눌러 확인하세요.
+          </div>
+        ` : `
+          <div class="explanation-box" style="margin-top:8px;">
+            <div class="explanation-title">💡 초정밀 해설 & 암기 포인트 (정답: ${item.answer + 1}번)</div>
+            <div style="white-space:pre-wrap;">${escapeHtml(item.explanation)}</div>
+          </div>
+        `}
       </div>
     `).join('');
 
-    // 개별 삭제 버튼 이벤트 바인딩
+    // 개별 마스터 삭제 이벤트
     dom.wrongNotesListContainer.querySelectorAll('.btn-remove-wrong').forEach(btn => {
       btn.addEventListener('click', () => {
         const id = parseInt(btn.dataset.removeId, 10);
@@ -850,35 +1221,24 @@
   function startRetakeWrongExam() {
     const list = getStoredWrongNotes();
     if (list.length === 0) {
-      alert('오답노트에 문제가 없습니다.');
+      alert('오답노트에 저장된 문제가 없습니다.');
       return;
     }
 
-    state.retakeExam = {
-      active: true,
-      title: '오답노트 집중 재도전 모의고사',
-      questions: [...list],
-      currentIndex: 0,
-      userAnswers: {},
-      bookmarks: new Set(),
-      mode: 'practice',
-      isSubmitted: false
-    };
-
-    // 기출문제 탭을 재도전 모드로 스위칭
+    stopPastTimer();
     state.pastExam.mode = 'practice';
-    switchMainMenu('past');
-    dom.pastRoundTitle.textContent = `🚨 오답 재도전 챌린지 (${list.length}문항)`;
-    dom.pastQuestionContainer.style.display = 'block';
-    dom.pastResultContainer.style.display = 'none';
+    state.pastExam.isRetakeMode = true;
+    state.pastExam.questions = [...list];
+    state.pastExam.currentIndex = 0;
+    state.pastExam.userAnswers = {};
+    state.pastExam.isSubmitted = false;
 
-    renderQuestionCard('retake');
-    renderOmrGrid('retake');
+    switchMainMenu('past');
   }
 
   function escapeHtml(str) {
     if (!str) return '';
-    return str
+    return String(str)
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')

@@ -4,11 +4,11 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="theme-color" content="#059669">
-  <meta name="description" content="산업안전산업기사 합격 마스터 - 기본정보, 5과목 기출 핵심요약, CBT 기출문제, 기출변형 응용문제, 스마트 오답노트">
+  <meta name="description" content="산업안전산업기사 합격 마스터 - 기본정보, 5과목 기출 핵심요약 35선, CBT 기출문제 50선, 기출변형 응용문제 25선, 스마트 오답노트">
   <link rel="manifest" href="manifest.json">
   <link rel="icon" type="image/svg+xml" href="icons/icon-192.svg">
   <link rel="apple-touch-icon" href="icons/icon-192.svg">
-  <title>산업안전산업기사 마스터 - 합격 전용 CBT & 오답노트</title>
+  <title>산업안전산업기사 마스터 - 합격 전용 CBT 75선 & 스마트 오답노트</title>
   <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
@@ -16,7 +16,7 @@
   <!-- PWA 앱 필수 가이드라인 배너 -->
   <aside class="pwa-notice-banner" id="pwaNoticeBanner">
     <div>
-      📢 <span class="highlight">PWA 설치/업데이트 안내:</span> 캐시가 꼬일 수 있으니 꼭 기존 앱을 완전히 삭제하고 설치하셔야 합니다.
+      📢 <span class="highlight">PWA 설치/업데이트 필수 안내:</span> 캐시가 꼬일 수 있으니 꼭 기존 앱을 완전히 삭제하고 설치하셔야 합니다.
     </div>
     <button class="pwa-notice-close" id="closeNoticeBtn" aria-label="공지 닫기">&times;</button>
   </aside>
@@ -27,8 +27,11 @@
       <div class="brand">
         <img src="icons/icon-192.svg" alt="안전모 로고" class="brand-icon">
         <div>
-          <h1 class="brand-title">산업안전산업기사 마스터</h1>
-          <p class="brand-subtitle">국가기술자격 안전관리 CBT & 스마트 오답노트</p>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <h1 class="brand-title">산업안전산업기사 마스터</h1>
+            <span class="edition-badge">PRO 75선</span>
+          </div>
+          <p class="brand-subtitle">국가기술자격 안전관리 정밀 CBT · 과락 판정 · 스마트 오답노트</p>
         </div>
       </div>
       <div class="header-actions">
@@ -37,22 +40,23 @@
     </div>
   </header>
 
-  <!-- 4대 메인 메뉴 탭 내비게이션 (이쁘게 정렬된 그리드 카드 스타일) -->
+  <!-- 4대 메인 메뉴 탭 내비게이션 -->
   <nav class="main-nav" aria-label="주요 학습 메뉴">
     <div class="nav-container">
       <button class="nav-tab-btn active" data-target="info">
         <span class="nav-icon">📋</span>
         <span class="nav-label">기본·핵심요약</span>
+        <span class="tab-badge badge-info">5과목 족보</span>
       </button>
       <button class="nav-tab-btn" data-target="past">
         <span class="nav-icon">📝</span>
         <span class="nav-label">기출문제 풀이</span>
-        <span class="tab-badge badge-cbt">CBT 15선</span>
+        <span class="tab-badge badge-cbt">CBT 50선</span>
       </button>
       <button class="nav-tab-btn" data-target="applied">
         <span class="nav-icon">💡</span>
         <span class="nav-label">기출변형 응용</span>
-        <span class="tab-badge badge-applied">고난도 8선</span>
+        <span class="tab-badge badge-applied">고난도 25선</span>
       </button>
       <button class="nav-tab-btn" data-target="wrongNotes">
         <span class="nav-icon">🚨</span>
@@ -71,22 +75,27 @@
     <section id="menu-info" class="content-section active">
       <div class="sub-tabs-wrapper">
         <div class="sub-tabs" role="tablist">
-          <button class="sub-tab-btn active" data-sub="summary">📖 과목별 기출 핵심요약</button>
-          <button class="sub-tab-btn" data-sub="overview">자격증 개요</button>
-          <button class="sub-tab-btn" data-sub="criteria">5개 과목 및 합격기준</button>
-          <button class="sub-tab-btn" data-sub="schedule">시험 일정</button>
-          <button class="sub-tab-btn" data-sub="eligibility">응시 자격 진단</button>
+          <button class="sub-tab-btn active" data-sub="summary">📖 과목별 기출 핵심요약집</button>
+          <button class="sub-tab-btn" data-sub="overview">📌 자격증 개요</button>
+          <button class="sub-tab-btn" data-sub="criteria">⚖️ 5과목 및 합격기준</button>
+          <button class="sub-tab-btn" data-sub="schedule">📅 시험 일정</button>
+          <button class="sub-tab-btn" data-sub="eligibility">🔍 응시자격 자가진단</button>
         </div>
       </div>
 
-      <!-- 기본정보 서브 1: 과목별 기출 핵심요약노트 (최우선 배치) -->
+      <!-- 기본정보 서브 1: 과목별 기출 핵심요약노트 -->
       <div id="sub-info-summary" class="sub-info-content">
         <article class="card">
           <div class="card-header-flex">
             <div>
-              <h2 class="card-title">📖 산업안전 5개 과목 기출 빈출 핵심요약집</h2>
-              <p class="card-subtitle">역대 기출문제에서 80% 이상 출제되는 초특급 암기 족보와 공식을 정리했습니다.</p>
+              <h2 class="card-title">📖 산업안전 5개 과목 초정밀 기출 핵심요약집</h2>
+              <p class="card-subtitle">역대 기출문제의 법령 수치, 계산 공식, 빈출 이론을 과목별로 빠짐없이 총정리했습니다.</p>
             </div>
+          </div>
+
+          <!-- 실시간 키워드 검색 바 -->
+          <div class="search-box-wrapper">
+            <input type="search" id="summarySearchInput" class="search-input" placeholder="🔍 요약노트 키워드 검색 (예: 하인리히, 도수율, FTA, 롤러기, 방폭, 안전난간, 히빙...)">
           </div>
 
           <!-- 5개 과목 선택 칩스 -->
@@ -96,12 +105,11 @@
             <button class="chip-btn" data-sub-id="sub3">3과목: 기계위험</button>
             <button class="chip-btn" data-sub-id="sub4">4과목: 전기·화학</button>
             <button class="chip-btn" data-sub-id="sub5">5과목: 건설안전</button>
+            <button class="chip-btn" data-sub-id="all">📚 전 과목 한번에 보기</button>
           </div>
 
           <!-- 세부 요약 본문 동적 주입 -->
-          <div id="detailedSummaryContainer" style="margin-top:16px;">
-            <!-- JS에서 과목별 렌더링 -->
-          </div>
+          <div id="detailedSummaryContainer" style="margin-top:16px;"></div>
         </article>
       </div>
 
@@ -112,16 +120,16 @@
           <p class="card-subtitle" id="infoCertSub">한국산업인력공단(Q-Net) 시행 | 안전관리 법정 필수 자격</p>
           <div class="info-details-grid">
             <div class="detail-box">
-              <strong>📌 자격 개요:</strong>
+              <strong>📌 자격 개요 및 수행 직무:</strong>
               <p id="infoCertOverview"></p>
             </div>
             <div class="detail-box">
-              <strong>🚀 진로 및 전망 (법정 안전관리자):</strong>
+              <strong>🚀 진로·전망 및 법정 안전관리자 선임:</strong>
               <p id="infoCertCareer"></p>
             </div>
             <div class="detail-box">
-              <strong>💳 응시 수수료:</strong>
-              <p id="infoCertFee" style="color:var(--primary); font-weight:700;"></p>
+              <strong>💳 검정 응시 수수료:</strong>
+              <p id="infoCertFee" style="color:var(--primary); font-weight:800;"></p>
             </div>
           </div>
         </article>
@@ -130,10 +138,8 @@
       <!-- 기본정보 서브 3: 과목 및 합격기준 -->
       <div id="sub-info-criteria" class="sub-info-content" style="display:none;">
         <article class="card">
-          <h2 class="card-title">⚖️ 5개 시험 과목 및 합격 기준</h2>
-          <div id="infoCriteriaContainer" style="display:flex; flex-direction:column; gap:16px;">
-            <!-- JS 렌더링 -->
-          </div>
+          <h2 class="card-title">⚖️ 5개 시험 과목 및 합격(과락) 기준</h2>
+          <div id="infoCriteriaContainer" style="display:flex; flex-direction:column; gap:16px;"></div>
         </article>
       </div>
 
@@ -152,9 +158,7 @@
                   <th>합격 발표</th>
                 </tr>
               </thead>
-              <tbody id="infoScheduleTableBody">
-                <!-- JS 렌더링 -->
-              </tbody>
+              <tbody id="infoScheduleTableBody"></tbody>
             </table>
           </div>
         </article>
@@ -167,34 +171,45 @@
           <p class="card-subtitle">나의 학력이나 경력이 산업안전 응시 요건에 해당하는지 체크하세요.</p>
           <div class="eligibility-checker">
             <h3 style="font-size:0.95rem; margin-bottom:10px;">해당하는 전공 및 경력 조건을 선택하세요:</h3>
-            <div id="eligibilityOptions">
-              <!-- JS 렌더링 -->
-            </div>
-            <div id="eligibilityResultBox" class="eligibility-result-box" style="display:none;">
-              <!-- 선택 결과 표시 -->
-            </div>
+            <div id="eligibilityOptions"></div>
+            <div id="eligibilityResultBox" class="eligibility-result-box" style="display:none;"></div>
           </div>
         </article>
       </div>
     </section>
 
     <!-- ==============================================
-         메뉴 2: 기출문제 풀이 메뉴 (15문항 CBT)
+         메뉴 2: 기출문제 풀이 메뉴 (50문항 CBT)
          ============================================== -->
     <section id="menu-past" class="content-section">
       <!-- 기출 세션 컨트롤 바 -->
       <div class="cbt-control-bar">
         <div class="cbt-meta-info">
           <span class="exam-mode-badge" id="pastModeBadge">연습 모드 (즉시해설)</span>
-          <span id="pastRoundTitle" style="font-weight:700; font-size:0.95rem;">산업안전 정기 기출 CBT</span>
+          <span id="pastRoundTitle" style="font-weight:800; font-size:0.98rem;">산업안전 정기 기출 CBT 50선</span>
         </div>
-        <div style="display:flex; align-items:center; gap:10px;">
+        <div class="cbt-control-actions">
           <div class="timer-box" id="pastTimerBox" style="display:none;">
-            ⏱️ <span id="pastTimerDisplay">25:00</span>
+            ⏱️ <span id="pastTimerDisplay">75:00</span>
           </div>
-          <button class="mode-switch-btn" id="togglePastModeBtn">실전 모의고사 모드로 전환</button>
+          <button class="mode-switch-btn" id="btnShufflePast" title="문항 순서를 무작위로 섞습니다">🔀 순서 섞기</button>
+          <button class="mode-switch-btn" id="togglePastModeBtn">⏱️ 실전 모의고사로 전환</button>
         </div>
       </div>
+
+      <!-- 과목별 필터 칩스 (기출문제) -->
+      <div class="subject-chips" id="pastSubjectFilterChips">
+        <button class="chip-btn active" data-filter="all">전체 과목 (50)</button>
+        <button class="chip-btn" data-filter="sub1">1과목: 안전관리 (10)</button>
+        <button class="chip-btn" data-filter="sub2">2과목: 인간·시스템 (10)</button>
+        <button class="chip-btn" data-filter="sub3">3과목: 기계위험 (10)</button>
+        <button class="chip-btn" data-filter="sub4">4과목: 전기·화학 (10)</button>
+        <button class="chip-btn" data-filter="sub5">5과목: 건설안전 (10)</button>
+        <button class="chip-btn" data-filter="bookmark">★ 북마크만</button>
+      </div>
+
+      <!-- 진행률 바 및 단축키 안내 -->
+      <div class="progress-status-bar" id="pastProgressBar"></div>
 
       <!-- OMR 문항 번호 시트 -->
       <div class="omr-grid-container" id="pastOmrGrid"></div>
@@ -207,19 +222,34 @@
     </section>
 
     <!-- ==============================================
-         메뉴 3: 기출문제로 응용문제를 만든 메뉴 (고난도 8선)
+         메뉴 3: 기출변형 응용문제 메뉴 (고난도 25선)
          ============================================== -->
     <section id="menu-applied" class="content-section">
       <!-- 응용문제 컨트롤 바 -->
       <div class="cbt-control-bar" style="border-left: 4px solid var(--warning);">
         <div class="cbt-meta-info">
           <span class="exam-mode-badge" style="background:var(--warning);">💡 기출변형·고난도</span>
-          <span id="appliedTitle" style="font-weight:700; font-size:0.95rem;">산업안전 기출변형 챌린지</span>
+          <span id="appliedTitle" style="font-weight:800; font-size:0.98rem;">산업안전 기출변형 챌린지 25선</span>
         </div>
-        <div style="font-size:0.85rem; color:var(--text-muted);">
-          공식 응용, 법령 수치 함정, 병렬 신뢰도 복합 문제
+        <div class="cbt-control-actions">
+          <button class="mode-switch-btn" id="btnShuffleApplied">🔀 순서 섞기</button>
+          <button class="mode-switch-btn" id="btnResetApplied">🔄 처음부터</button>
         </div>
       </div>
+
+      <!-- 과목별 필터 칩스 (응용문제) -->
+      <div class="subject-chips" id="appliedSubjectFilterChips">
+        <button class="chip-btn active" data-filter="all">전체 응용 (25)</button>
+        <button class="chip-btn" data-filter="sub1">1과목 응용 (5)</button>
+        <button class="chip-btn" data-filter="sub2">2과목 응용 (5)</button>
+        <button class="chip-btn" data-filter="sub3">3과목 응용 (5)</button>
+        <button class="chip-btn" data-filter="sub4">4과목 응용 (5)</button>
+        <button class="chip-btn" data-filter="sub5">5과목 응용 (5)</button>
+        <button class="chip-btn" data-filter="bookmark">★ 북마크만</button>
+      </div>
+
+      <!-- 진행률 바 -->
+      <div class="progress-status-bar" id="appliedProgressBar"></div>
 
       <!-- OMR 문항 번호 시트 -->
       <div class="omr-grid-container" id="appliedOmrGrid"></div>
@@ -232,34 +262,33 @@
     </section>
 
     <!-- ==============================================
-         메뉴 4: 스마트 오답노트 메뉴 (신규!)
+         메뉴 4: 스마트 오답노트 메뉴
          ============================================== -->
     <section id="menu-wrongNotes" class="content-section">
       <article class="card">
         <div class="card-header-flex">
           <div>
-            <h2 class="card-title" style="color:var(--danger);">🚨 스마트 오답노트 & 취약점 분석</h2>
-            <p class="card-subtitle">기출문제와 응용문제를 풀며 틀린 문제들이 자동 저장됩니다. 완벽히 외울 때까지 반복 복습하세요.</p>
+            <h2 class="card-title" style="color:var(--danger);">🚨 스마트 오답노트 & 취약 과목 집중 복습</h2>
+            <p class="card-subtitle">틀린 문항과 누적 오답 횟수가 자동 기록됩니다. '오답만 다시 풀기'에서 정답을 맞히면 자동 마스터 처리됩니다.</p>
           </div>
-          <div style="display:flex; gap:8px;">
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">
             <button class="btn btn-primary" id="btnRetakeWrongQuestions">
-              🔥 오답만 다시 풀기
+              🔥 오답만 다시 풀기 (재도전)
             </button>
-            <button class="btn btn-secondary" id="btnClearAllWrongNotes" style="font-size:0.82rem;">
-              전체 비우기
+            <button class="btn btn-secondary" id="btnToggleAllWrongExplanations" style="font-size:0.84rem;">
+              👁️ 정답/해설 가리기
+            </button>
+            <button class="btn btn-secondary" id="btnClearAllWrongNotes" style="font-size:0.84rem;">
+              🗑️ 전체 비우기
             </button>
           </div>
         </div>
 
-        <!-- 오답 통계 요약 바 -->
-        <div class="wrong-stats-bar" id="wrongStatsBar">
-          <!-- JS에서 동적 주입 -->
-        </div>
+        <!-- 오답 과목 필터 및 통계 바 -->
+        <div class="wrong-stats-bar" id="wrongStatsBar"></div>
 
         <!-- 오답 목록 리스트 컨테이너 -->
-        <div id="wrongNotesListContainer" style="margin-top:20px; display:flex; flex-direction:column; gap:16px;">
-          <!-- JS에서 동적 주입 -->
-        </div>
+        <div id="wrongNotesListContainer" style="margin-top:20px; display:flex; flex-direction:column; gap:16px;"></div>
       </article>
     </section>
 
@@ -267,8 +296,8 @@
 
   <!-- 하단 푸터 -->
   <footer class="app-footer">
-    <p>산업안전산업기사 합격 마스터 | 비용 0원 무료 PWA 모바일 웹앱</p>
-    <p style="margin-top:4px; font-size:0.75rem; color:#94a3b8;">한국산업인력공단 안전관리 분야 출제기준 완벽 반영</p>
+    <p><strong>산업안전산업기사 합격 마스터 (PRO 75선)</strong> | 비용 0원 무료 PWA 모바일·데스크탑 웹앱</p>
+    <p style="margin-top:4px; font-size:0.75rem; color:#94a3b8;">⌨️ PC 단축키 지원: 숫자키 [1~4] 정답 선택 | 방향키 [←/→] 이전·다음 문제 | [B] 북마크 별표</p>
   </footer>
 
   <!-- 데이터 및 앱 스크립트 로드 -->
