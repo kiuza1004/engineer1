@@ -1,11 +1,11 @@
 {
-  "name": "산업기사 자격증 마스터",
-  "short_name": "산업기사공부",
-  "description": "산업기사 기본정보, 기출문제 CBT, 기출변형 응용문제 완벽 대비 어플",
+  "name": "산업안전산업기사 마스터",
+  "short_name": "산업안전CBT",
+  "description": "산업안전산업기사 기본정보, 5과목 기출문제 CBT, 기출변형 응용문제 완벽 대비 웹앱",
   "start_url": "./index.html",
   "display": "standalone",
-  "background_color": "#0f172a",
-  "theme_color": "#2563eb",
+  "background_color": "#064e3b",
+  "theme_color": "#059669",
   "orientation": "portrait-primary",
   "icons": [
     {

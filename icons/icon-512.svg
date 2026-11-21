@@ -1,21 +1,23 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
   <defs>
-    <linearGradient id="grad512" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#3b82f6" />
-      <stop offset="100%" stop-color="#1e40af" />
+    <linearGradient id="safetyGrad512" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#059669" />
+      <stop offset="100%" stop-color="#064e3b" />
     </linearGradient>
     <filter id="shadow512" x="-10%" y="-10%" width="120%" height="120%">
       <feDropShadow dx="0" dy="10" stdDeviation="15" flood-color="#000" flood-opacity="0.35"/>
     </filter>
   </defs>
-  <rect width="512" height="512" rx="110" fill="url(#grad512)" />
-  <g filter="url(#shadow512)" fill="#ffffff">
-    <path d="M256 118 L410 198 L256 278 L102 198 Z" />
-    <path d="M160 235 V315 C160 358 352 358 352 315 V235" fill="none" stroke="#ffffff" stroke-width="20" stroke-linecap="round"/>
-    <circle cx="410" cy="262" r="16" />
-    <line x1="410" y1="198" x2="410" y2="262" stroke="#ffffff" stroke-width="10" />
-    <!-- 체크 배지 -->
-    <circle cx="352" cy="352" r="64" fill="#10b981" stroke="#ffffff" stroke-width="8"/>
-    <path d="M326 352 L344 370 L382 332" fill="none" stroke="#ffffff" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect width="512" height="512" rx="110" fill="url(#safetyGrad512)" />
+  <g filter="url(#shadow512)">
+    <!-- 안전모(Helmet) & 녹색십자 심볼 -->
+    <path d="M120 290 C120 170 392 170 392 290 Z" fill="#fbbf24" stroke="#ffffff" stroke-width="10"/>
+    <rect x="90" y="285" width="332" height="36" rx="18" fill="#f59e0b" stroke="#ffffff" stroke-width="8"/>
+    <!-- 안전 녹색십자 마크 -->
+    <rect x="240" y="200" width="32" height="64" rx="4" fill="#047857" />
+    <rect x="224" y="216" width="64" height="32" rx="4" fill="#047857" />
+    <!-- 합격 체크 배지 -->
+    <circle cx="370" cy="370" r="60" fill="#10b981" stroke="#ffffff" stroke-width="8"/>
+    <path d="M344 370 L362 388 L400 350" fill="none" stroke="#ffffff" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
   </g>
 </svg>

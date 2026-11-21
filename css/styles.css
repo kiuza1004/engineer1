@@ -4,14 +4,14 @@
 ============================================================ */
 
 :root {
-  --primary: #2563eb;
-  --primary-hover: #1d4ed8;
-  --primary-light: #eff6ff;
+  --primary: #059669;
+  --primary-hover: #047857;
+  --primary-light: #ecfdf5;
   --success: #10b981;
   --success-bg: #ecfdf5;
   --danger: #ef4444;
   --danger-bg: #fef2f2;
-  --warning: #f59e0b;
+  --warning: #d97706;
   --warning-bg: #fffbeb;
   --bg-main: #f8fafc;
   --bg-card: #ffffff;
