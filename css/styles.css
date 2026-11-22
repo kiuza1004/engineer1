@@ -505,6 +505,23 @@ body {
   gap: 10px;
 }
 
+.exam-select-box {
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background-color: var(--bg-main);
+  color: var(--text-main);
+  font-size: 0.88rem;
+  font-weight: 800;
+  cursor: pointer;
+  outline: none;
+  transition: all 0.15s ease;
+}
+.exam-select-box:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px rgba(5, 150, 105, 0.2);
+}
+
 .cbt-control-actions {
   display: flex;
   align-items: center;

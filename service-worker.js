@@ -1,4 +1,4 @@
-const CACHE_NAME = 'engineer-study-app-v3-argon';
+const CACHE_NAME = 'engineer-study-app-v4-recent-3years';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',

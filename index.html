@@ -4,11 +4,11 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="theme-color" content="#059669">
-  <meta name="description" content="산업안전산업기사 합격 마스터 - 기본정보, 5과목 기출 핵심요약 35선, CBT 기출문제 50선, 기출변형 응용문제 25선, 스마트 오답노트">
+  <meta name="description" content="산업안전산업기사 합격 마스터 - 기본정보, 5과목 기출 핵심요약 35선, 최근 3개년(2022~2024) 정기 기출 CBT 200선, 기출변형 응용 25선, 스마트 오답노트">
   <link rel="manifest" href="manifest.json">
   <link rel="icon" type="image/svg+xml" href="icons/icon-192.svg">
   <link rel="apple-touch-icon" href="icons/icon-192.svg">
-  <title>산업안전산업기사 마스터 - 합격 전용 CBT 75선 & 스마트 오답노트</title>
+  <title>산업안전산업기사 마스터 - 최근 3개년 기출 200선 & 변형 25선 스마트 CBT</title>
   <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
@@ -29,9 +29,9 @@
         <div>
           <div style="display:flex; align-items:center; gap:8px;">
             <h1 class="brand-title">산업안전산업기사 마스터</h1>
-            <span class="edition-badge">PRO 75선</span>
+            <span class="edition-badge">PRO 225선 (최근 3개년)</span>
           </div>
-          <p class="brand-subtitle">국가기술자격 안전관리 정밀 CBT · 과락 판정 · 스마트 오답노트</p>
+          <p class="brand-subtitle">국가기술자격 2022~2024 기출 정밀 CBT · 과락 판정 · 스마트 오답노트</p>
         </div>
       </div>
       <div class="header-actions">
@@ -51,7 +51,7 @@
       <button class="nav-tab-btn" data-target="past">
         <span class="nav-icon">📝</span>
         <span class="nav-label">기출문제 풀이</span>
-        <span class="tab-badge badge-cbt">CBT 50선</span>
+        <span class="tab-badge badge-cbt">기출 200선</span>
       </button>
       <button class="nav-tab-btn" data-target="applied">
         <span class="nav-icon">💡</span>
@@ -179,14 +179,20 @@
     </section>
 
     <!-- ==============================================
-         메뉴 2: 기출문제 풀이 메뉴 (50문항 CBT)
+         메뉴 2: 기출문제 풀이 메뉴 (최근 3개년 200문항 CBT)
          ============================================== -->
     <section id="menu-past" class="content-section">
       <!-- 기출 세션 컨트롤 바 -->
       <div class="cbt-control-bar">
-        <div class="cbt-meta-info">
+        <div class="cbt-meta-info" style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+          <select id="pastExamSetSelect" class="exam-select-box" aria-label="기출문제 회차 선택">
+            <option value="safety_2024">📅 2024년 정기 기출 실전 (최신)</option>
+            <option value="safety_2023">📅 2023년 정기 기출 실전</option>
+            <option value="safety_2022">📅 2022년 정기 기출 실전</option>
+            <option value="safety_past_50">⭐ 전 과목 핵심 빈출 50선 (통합)</option>
+          </select>
           <span class="exam-mode-badge" id="pastModeBadge">연습 모드 (즉시해설)</span>
-          <span id="pastRoundTitle" style="font-weight:800; font-size:0.98rem;">산업안전 정기 기출 CBT 50선</span>
+          <span id="pastRoundTitle" style="font-weight:800; font-size:0.98rem;">2024년 정기 기출 CBT (최신)</span>
         </div>
         <div class="cbt-control-actions">
           <div class="timer-box" id="pastTimerBox" style="display:none;">

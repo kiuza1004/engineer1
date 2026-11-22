@@ -41,6 +41,7 @@
     theme: localStorage.getItem(STORAGE_KEY_THEME) || 'light',
 
     pastExam: {
+      selectedExamId: 'safety_2024',
       mode: 'practice', // 'practice' | 'mock'
       subjectFilter: 'all', // 'all' | 'sub1' ~ 'sub5' | 'bookmark'
       questions: [],
@@ -95,6 +96,7 @@
     eligibilityResultBox: document.getElementById('eligibilityResultBox'),
     infoCriteriaContainer: document.getElementById('infoCriteriaContainer'),
     // 기출문제
+    pastExamSetSelect: document.getElementById('pastExamSetSelect'),
     pastRoundTitle: document.getElementById('pastRoundTitle'),
     pastModeBadge: document.getElementById('pastModeBadge'),
     pastTimerBox: document.getElementById('pastTimerBox'),
@@ -154,6 +156,7 @@
 
     const itemData = {
       id: questionObj.id,
+      examYear: questionObj.examYear || '',
       subjectId: questionObj.subjectId || 'sub1',
       subject: questionObj.subject,
       question: questionObj.question,
@@ -204,12 +207,51 @@
   }
 
   // 4. 문제 목록 필터링 및 초기화
+  function getPastExamSet(examId) {
+    if (!APP_DATA.pastExams || APP_DATA.pastExams.length === 0) return null;
+    return APP_DATA.pastExams.find(e => e.id === examId) || APP_DATA.pastExams[0];
+  }
+
+  function updatePastSubjectFilterBadges(allQuestions) {
+    if (!dom.pastSubjectFilterChips) return;
+    const countMap = { all: allQuestions.length, sub1: 0, sub2: 0, sub3: 0, sub4: 0, sub5: 0, bookmark: 0 };
+    allQuestions.forEach(q => {
+      if (countMap[q.subjectId] !== undefined) countMap[q.subjectId]++;
+      if (sharedBookmarks.has(q.id)) countMap.bookmark++;
+    });
+
+    const labels = {
+      all: `전체 과목 (${countMap.all})`,
+      sub1: `1과목: 안전관리 (${countMap.sub1})`,
+      sub2: `2과목: 인간·시스템 (${countMap.sub2})`,
+      sub3: `3과목: 기계위험 (${countMap.sub3})`,
+      sub4: `4과목: 전기·화학 (${countMap.sub4})`,
+      sub5: `5과목: 건설안전 (${countMap.sub5})`,
+      bookmark: `★ 북마크만 (${countMap.bookmark})`
+    };
+
+    dom.pastSubjectFilterChips.querySelectorAll('.chip-btn').forEach(btn => {
+      const f = btn.dataset.filter;
+      if (labels[f]) btn.textContent = labels[f];
+    });
+  }
+
   function buildFilteredQuestions(type) {
-    const sourceQuestions = type === 'past'
-      ? APP_DATA.pastExams[0].questions
-      : APP_DATA.appliedExams[0].questions;
     const examState = type === 'past' ? state.pastExam : state.appliedExam;
     const filter = examState.subjectFilter;
+
+    let sourceQuestions;
+    if (type === 'past') {
+      if (examState.isRetakeMode) {
+        sourceQuestions = examState.questions;
+      } else {
+        const examSet = getPastExamSet(examState.selectedExamId);
+        sourceQuestions = examSet ? examSet.questions : [];
+        updatePastSubjectFilterBadges(sourceQuestions);
+      }
+    } else {
+      sourceQuestions = APP_DATA.appliedExams[0].questions;
+    }
 
     let filtered = sourceQuestions.filter(q => {
       if (filter === 'all') return true;
@@ -328,6 +370,26 @@
           buildFilteredQuestions('past');
           renderPastExam();
         });
+      });
+    }
+
+    // 기출문제 연도/회차 변경 셀렉터
+    if (dom.pastExamSetSelect) {
+      dom.pastExamSetSelect.addEventListener('change', (e) => {
+        state.pastExam.selectedExamId = e.target.value;
+        state.pastExam.isRetakeMode = false;
+        state.pastExam.subjectFilter = 'all';
+        state.pastExam.userAnswers = {};
+        state.pastExam.isSubmitted = false;
+        state.pastExam.currentIndex = 0;
+        stopPastTimer();
+        if (dom.pastSubjectFilterChips) {
+          dom.pastSubjectFilterChips.querySelectorAll('.chip-btn').forEach(c => {
+            c.classList.toggle('active', c.dataset.filter === 'all');
+          });
+        }
+        buildFilteredQuestions('past');
+        renderPastExam();
       });
     }
 
@@ -641,9 +703,19 @@
 
   function renderPastExam() {
     const s = state.pastExam;
+    const currentExamSet = getPastExamSet(s.selectedExamId);
+    const titleText = currentExamSet ? currentExamSet.title : '산업안전 정기 기출 CBT';
+
     dom.pastRoundTitle.textContent = s.isRetakeMode
       ? `🔥 오답노트 집중 재도전 (${s.questions.length}문항)`
-      : `산업안전 정기 기출 CBT (${s.questions.length}문항)`;
+      : `${titleText} (${s.questions.length}문항)`;
+
+    if (dom.pastExamSetSelect) {
+      dom.pastExamSetSelect.style.display = s.isRetakeMode ? 'none' : 'inline-block';
+      if (!s.isRetakeMode && s.selectedExamId) {
+        dom.pastExamSetSelect.value = s.selectedExamId;
+      }
+    }
 
     dom.pastModeBadge.textContent = s.mode === 'practice' ? '연습 모드 (즉시해설)' : '실전 모의고사 (타이머)';
     dom.pastModeBadge.style.backgroundColor = s.mode === 'practice' ? 'var(--primary)' : 'var(--danger)';
@@ -1153,6 +1225,7 @@
         <div class="wrong-card-header">
           <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
             <span class="question-tag">${escapeHtml(item.subject)}</span>
+            ${item.examYear ? `<span style="background:var(--primary-light); color:var(--primary); font-size:0.78rem; font-weight:800; padding:2px 8px; border-radius:9999px;">📅 ${escapeHtml(item.examYear)}</span>` : ''}
             <span class="wrong-count-pill">🔥 누적 ${item.wrongCount || 1}회 틀림</span>
             ${item.lawRef ? `<span class="law-ref-badge">📌 ${escapeHtml(item.lawRef)}</span>` : ''}
           </div>
